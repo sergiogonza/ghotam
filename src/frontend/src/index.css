@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+/* AEGIS Dark Theme – Gotham Aesthetic */
+:root {
+  --aegis-bg: #0a0e17;
+  --aegis-surface: #111827;
+  --aegis-surface-2: #1a2332;
+  --aegis-border: #1e293b;
+  --aegis-accent: #06b6d4;
+  --aegis-accent-2: #3b82f6;
+  --aegis-danger: #ef4444;
+  --aegis-warning: #f59e0b;
+  --aegis-success: #10b981;
+  --aegis-text: #e2e8f0;
+  --aegis-text-muted: #64748b;
+  --aegis-glow: 0 0 20px rgba(6, 182, 212, 0.15);
+}
+
+body {
+  background: var(--aegis-bg);
+  color: var(--aegis-text);
+  font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--aegis-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--aegis-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--aegis-text-muted);
+}
+
+/* Graph tooltip */
+.cy-tooltip {
+  background: var(--aegis-surface-2);
+  border: 1px solid var(--aegis-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--aegis-text);
+  box-shadow: var(--aegis-glow);
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(6, 182, 212, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.6); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* Card styles */
+.aegis-card {
+  background: var(--aegis-surface);
+  border: 1px solid var(--aegis-border);
+  border-radius: 12px;
+  box-shadow: var(--aegis-glow);
+}
+
+.aegis-card-hover:hover {
+  border-color: var(--aegis-accent);
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.2);
+  transition: all 0.3s ease;
+}
+
+/* Severity badges */
+.severity-1 { color: #94a3b8; }
+.severity-2 { color: #60a5fa; }
+.severity-3 { color: #fbbf24; }
+.severity-4 { color: #f97316; }
+.severity-5 { color: #ef4444; }
+
+.severity-bg-1 { background: rgba(148, 163, 184, 0.1); border-color: rgba(148, 163, 184, 0.3); }
+.severity-bg-2 { background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.3); }
+.severity-bg-3 { background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.3); }
+.severity-bg-4 { background: rgba(249, 115, 22, 0.1); border-color: rgba(249, 115, 22, 0.3); }
+.severity-bg-5 { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); }
+
+/* Leaflet dark override */
+.leaflet-container {
+  background: #0d1117;
+}
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2);
+}
+.leaflet-control-zoom a {
+  background: var(--aegis-surface) !important;
+  color: var(--aegis-text) !important;
+  border-color: var(--aegis-border) !important;
+}
+
+/* vis-timeline dark override */
+.vis-timeline {
+  border-color: var(--aegis-border) !important;
+  background: var(--aegis-surface) !important;
+}
+.vis-time-axis .vis-text {
+  color: var(--aegis-text-muted) !important;
+}
+.vis-item {
+  background: var(--aegis-surface-2) !important;
+  border-color: var(--aegis-accent) !important;
+  color: var(--aegis-text) !important;
+  border-radius: 4px !important;
+  font-size: 11px !important;
+}
+.vis-item.vis-selected {
+  border-color: var(--aegis-accent) !important;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.5) !important;
+}
+
+/* ── Link Analysis Animations ── */
+
+@keyframes link-flow {
+  0% { stroke-dashoffset: 20; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes node-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.6); }
+}
+
+@keyframes crosshair-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-crosshair {
+  animation: crosshair-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Link Analysis Step Guide Bar ── */
+
+.link-guide-bar {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.04), rgba(59, 130, 246, 0.04));
+  backdrop-filter: blur(8px);
+  animation: guide-bar-in 0.35s ease-out;
+}
+
+@keyframes guide-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Markdown Modal fade-in ── */
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
