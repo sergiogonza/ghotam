@@ -35,31 +35,67 @@ AEGIS uses **OWL 2.0** (Web Ontology Language) written in **Turtle syntax**. The
 
 The TBox (Terminological Box) defines the **types** of entities that can exist in the domain:
 
-```
-Facility                          Event
-├── WaterTreatmentPlant           ├── PhysicalAnomalyEvent
-├── PumpStation                   ├── AccessEvent
-├── Reservoir                     ├── CyberAlertEvent
-└── DistributionNode              ├── MaintenanceEvent
-                                  └── CitizenReportEvent
-Person                    
-├── Employee              Asset                    Organization
-└── Contractor            ├── Valve                Sensor
-                          ├── PLC                  Observation
-                          ├── Camera               Substance
-                          ├── Pump                 Location
-                          ├── RTU
-                          ├── FlowMeter            Document
-                          └── (generic)            ├── MaintenanceReport
-                                                   ├── LabAnalysis
-RiskCase                                           ├── ScadaLog
-└── SuspectedSabotage                              ├── EmailCommunication
-    ← Requires ≥3 linkedEvent                      ├── WorkerProfile
-       (OWL axiom)                                 ├── VideoTranscription
-                                                   ├── RegulatoryInspection
-                                                   ├── IncidentPhoto
-                                                   ├── AccessBadgeRecord
-                                                   └── DatabaseExtract
+```mermaid
+flowchart TD
+    subgraph Facilities
+        F[Facility]
+        F --> F1[WaterTreatmentPlant]
+        F --> F2[PumpStation]
+        F --> F3[Reservoir]
+        F --> F4[DistributionNode]
+    end
+
+    subgraph Events
+        E[Event]
+        E --> E1[PhysicalAnomalyEvent]
+        E --> E2[AccessEvent]
+        E --> E3[CyberAlertEvent]
+        E --> E4[MaintenanceEvent]
+        E --> E5[CitizenReportEvent]
+    end
+
+    subgraph People
+        P[Person]
+        P --> P1[Employee]
+        P --> P2[Contractor]
+    end
+
+    subgraph Assets
+        A[Asset]
+        A --> A1[Valve]
+        A --> A2[PLC]
+        A --> A3[Camera]
+        A --> A4[Pump]
+        A --> A5[RTU]
+        A --> A6[FlowMeter]
+    end
+
+    subgraph Documents
+        D[Document]
+        D --> D1[MaintenanceReport]
+        D --> D2[LabAnalysis]
+        D --> D3[ScadaLog]
+        D --> D4[EmailCommunication]
+        D --> D5[WorkerProfile]
+        D --> D6[VideoTranscription]
+        D --> D7[RegulatoryInspection]
+        D --> D8[IncidentPhoto]
+        D --> D9[AccessBadgeRecord]
+        D --> D10[DatabaseExtract]
+    end
+
+    subgraph Other
+        O[Organization]
+        S[Sensor]
+        OB[Observation]
+        SU[Substance]
+        L[Location]
+    end
+
+    subgraph Risk
+        R[RiskCase]
+        R --> R1["SuspectedSabotage\n(requires ≥3 linkedEvent — OWL axiom)"]
+    end
 ```
 
 Each class becomes a **Neo4j label**. Sub-classes become **multi-labels** — a WaterTreatmentPlant node has both `:Facility` and `:WaterTreatmentPlant` labels, enabling queries at any specificity level.

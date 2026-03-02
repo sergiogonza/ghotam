@@ -36,58 +36,67 @@ The hidden link analysis reveals 6 categories of previously invisible connection
 
 #### 1. 🏢 Organizational Chain
 
-```
-Person A (Employee, Canal de Isabel II)
-  └─ BELONGS_TO → Organization (Canal de Isabel II)
-       └─ ← BELONGS_TO ─ Person B (Employee, same org but different facility)
+```mermaid
+flowchart LR
+    A["👤 Person A\nEmployee"] -- BELONGS_TO --> O["🏢 Organization\nCanal de Isabel II"]
+    B["👤 Person B\nEmployee, different facility"] -- BELONGS_TO --> O
 ```
 
 **Why it matters**: Employees at different facilities who share organizational allegiance could coordinate insider attacks across locations.
 
 #### 2. 👥 Actor Confluence
 
-```
-Person A
-  └─ INVOLVES_PERSON ← Event (Unauthorized access, 02:00 AM)
-       └─ INVOLVES_PERSON → Person B
+```mermaid
+flowchart LR
+    E["⚠️ Event\nUnauthorized access\n02:00 AM"] -- INVOLVES_PERSON --> A["👤 Person A"]
+    E -- INVOLVES_PERSON --> B["👤 Person B"]
 ```
 
 **Why it matters**: Two persons linked to the same suspicious event but not otherwise connected suggests either conspiracy or shared targeting.
 
 #### 3. 🔧 Shared Asset Exploitation
 
-```
-Person A ─ INVOLVES_PERSON ← Event ─ OCCURS_AT → Facility
-                                           └─ HAS_ASSET → Asset (PLC-02)
-                                                └─ HAS_ASSET ← Facility 2
-                                                      └─ OCCURS_AT ← Event 2 ─ INVOLVES_PERSON → Person B
+```mermaid
+flowchart LR
+    E1["⚠️ Event 1"] -- INVOLVES_PERSON --> A["👤 Person A"]
+    E1 -- OCCURS_AT --> F1["🏭 Facility 1"]
+    F1 -- HAS_ASSET --> AS["🔧 Asset\nPLC-02"]
+    F2["🏭 Facility 2"] -- HAS_ASSET --> AS
+    E2["⚠️ Event 2"] -- OCCURS_AT --> F2
+    E2 -- INVOLVES_PERSON --> B["👤 Person B"]
 ```
 
 **Why it matters**: Similar assets at different facilities could share vulnerabilities. If an attacker exploits PLC-02 at one plant, all facilities with the same asset model are at risk.
 
 #### 4. 🧪 Substance Cross-Match
 
-```
-Event (Chlorine spike, Facility A) ─ INVOLVES_SUBSTANCE → Substance (Chlorine)
-                                                              └─ INVOLVES_SUBSTANCE ← Event (Chlorine anomaly, Facility B)
+```mermaid
+flowchart LR
+    E1["⚠️ Event\nChlorine spike\nFacility A"] -- INVOLVES_SUBSTANCE --> S["🧪 Substance\nChlorine"]
+    E2["⚠️ Event\nChlorine anomaly\nFacility B"] -- INVOLVES_SUBSTANCE --> S
 ```
 
 **Why it matters**: Anomalies involving the same chemical substance across facilities suggest a coordinated chemical attack.
 
 #### 5. 📡 Sensor-Person Correlation
 
-```
-Sensor ─ HAS_SENSOR ← Facility ─ OCCURS_AT ← Event ─ INVOLVES_PERSON → Person
+```mermaid
+flowchart LR
+    F["🏭 Facility"] -- HAS_SENSOR --> S["📡 Sensor"]
+    E["⚠️ Event"] -- OCCURS_AT --> F
+    E -- INVOLVES_PERSON --> P["👤 Person"]
 ```
 
 **Why it matters**: Associates a person with specific sensor anomalies through the facility graph, even when no direct person-sensor relationship exists.
 
 #### 6. 📍 Geographic Triangle
 
-```
-Facility A ─ LOCATED_AT → Location (Madrid Region)
-                              └─ LOCATED_AT ← Facility B
-                                    └─ OCCURS_AT ← Event ─ INVOLVES_PERSON → Person C
+```mermaid
+flowchart LR
+    FA["🏭 Facility A"] -- LOCATED_AT --> L["📍 Location\nMadrid Region"]
+    FB["🏭 Facility B"] -- LOCATED_AT --> L
+    E["⚠️ Event"] -- OCCURS_AT --> FB
+    E -- INVOLVES_PERSON --> P["👤 Person C"]
 ```
 
 **Why it matters**: Geographic proximity of incidents can reveal territorial patterns in adversary operations.

@@ -229,25 +229,19 @@ When an analyst searches "chlorine Móstoles", the system:
 
 Each hit carries metadata that identifies its origin:
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ 🟡 CONFIDENTIAL    📄 scada_log    Score: 8.42              │
-│                                                              │
-│ PLC Setpoint Change — ETAP Móstoles                          │
-│ "Chlorine dosing rate changed from 1.2 mg/L to 3.8 mg/L..." │
-│                                                              │
-│ Source: scada_export_2026-01.csv  │  2026-01-15  │  ETAP Mó… │
-└──────────────────────────────────────────────────────────────┘
+> **🟡 CONFIDENTIAL** · 📄 `scada_log` · Score: **8.42**
+>
+> **PLC Setpoint Change — ETAP Móstoles**
+> *"Chlorine dosing rate changed from 1.2 mg/L to 3.8 mg/L..."*
+>
+> Source: `scada_export_2026-01.csv` · 2026-01-15 · ETAP Móstoles
 
-┌──────────────────────────────────────────────────────────────┐
-│ 🟢 EVENT    ⚠️ Severity 4    Score: 7.91                     │
-│                                                              │
-│ Physical anomaly: chlorine_mg_l at ETAP Móstoles             │
-│ "Chlorine level exceeded maximum threshold: 3.8 mg/L..."     │
-│                                                              │
-│ EVT-0342  │  2026-01-15T02:20:00Z  │  ETAP Móstoles         │
-└──────────────────────────────────────────────────────────────┘
-```
+> **🟢 EVENT** · ⚠️ Severity 4 · Score: **7.91**
+>
+> **Physical anomaly: chlorine_mg_l at ETAP Móstoles**
+> *"Chlorine level exceeded maximum threshold: 3.8 mg/L..."*
+>
+> `EVT-0342` · 2026-01-15T02:20:00Z · ETAP Móstoles
 
 The key insight: the same search returns both the **SCADA log** (document evidence) and the **sensor event** (operational alert), letting the analyst see cause and effect side by side.
 
@@ -323,13 +317,13 @@ The generator ensures referential integrity:
 
 Events in Neo4j use **multi-label nodes** (ontology-driven):
 
-```
-Event                          ← Base label (all events)
-├── Event:PhysicalAnomalyEvent ← Sensor anomalies
-├── Event:AccessEvent          ← Badge access (authorized/unauthorized)
-├── Event:CyberAlertEvent      ← Network/SCADA cyber events
-├── Event:CitizenReportEvent   ← Public complaints
-└── Event:MaintenanceEvent     ← Work orders and inspections
+```mermaid
+flowchart LR
+    E[Event] --> PA[PhysicalAnomalyEvent\nSensor anomalies]
+    E --> AE[AccessEvent\nBadge access]
+    E --> CA[CyberAlertEvent\nNetwork / SCADA]
+    E --> CR[CitizenReportEvent\nPublic complaints]
+    E --> ME[MaintenanceEvent\nWork orders]
 ```
 
 Each subtype has specialized properties:

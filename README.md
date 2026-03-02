@@ -70,38 +70,22 @@ In a traditional system, you'd open 7 different applications: SCADA dashboard, a
 
 Now imagine all seven data sources feed into a single **knowledge graph**:
 
-```
-                    ┌─────────────┐
-                    │  Person:    │
-        ┌──────────│  Dmitri V.  │──────────┐
-        │           │  Contractor │           │
-        │           └─────────────┘           │
-        │                  │                  │
-   CONNECTED_TO      BELONGS_TO         INVOLVES_PERSON
-        │                  │                  │
-        ▼                  ▼                  ▼
-  ┌──────────┐    ┌──────────────┐    ┌──────────────┐
-  │ Person:  │    │Organization: │    │   Event:     │
-  │ Carlos G.│    │ AquaServ     │    │ PLC login    │
-  │ Employee │    │ Maintenance  │    │ attempt 03:12│
-  └──────────┘    └──────────────┘    └──────────────┘
-                         │                    │
-                    OPERATES_IN          OCCURS_AT
-                         │                    │
-                         ▼                    ▼
-                  ┌──────────────┐    ┌──────────────┐
-                  │  Location:   │    │  Facility:   │
-                  │  Madrid Zone │    │  ETAP Norte  │
-                  └──────────────┘    └──────────────┘
-                                            │
-                                       HAS_SENSOR
-                                            │
-                                            ▼
-                                     ┌──────────────┐
-                                     │   Sensor:    │
-                                     │  Chlorine    │
-                                     │  → 0.02 mg/L │
-                                     └──────────────┘
+```mermaid
+flowchart TD
+    P["🧑 Person\nDmitri V.\nContractor"]
+    C["🧑 Person\nCarlos G.\nEmployee"]
+    O["🏢 Organization\nAquaServ\nMaintenance"]
+    E["⚠️ Event\nPLC login attempt\n03:12 AM"]
+    L["📍 Location\nMadrid Zone"]
+    F["🏭 Facility\nETAP Norte"]
+    S["📡 Sensor\nChlorine\n→ 0.02 mg/L"]
+
+    P -- CONNECTED_TO --> C
+    P -- BELONGS_TO --> O
+    P -- INVOLVES_PERSON --> E
+    O -- OPERATES_IN --> L
+    E -- OCCURS_AT --> F
+    F -- HAS_SENSOR --> S
 ```
 
 One query. One traversal. The relationship between Dmitri, his company, the zone they operate in, the plant in that zone, the PLC login attempt, and the chlorine sensor dropping — **all visible in a single graph exploration.**
