@@ -5,10 +5,31 @@ import type { IntelEvent } from './types';
 
 const colors: Record<string,string> = { Event:'#f59e0b', Actor:'#06b6d4', Location:'#f472b6', Source:'#8b5cf6' };
 
+function normalizeEvent(raw:any, index:number): IntelEvent {
+  return {
+    id:String(raw?.id || `event-${index}`),
+    title:String(raw?.title || 'Evento sin título'),
+    description:String(raw?.description || ''),
+    link:String(raw?.link || ''),
+    source:String(raw?.source || 'Fuente desconocida'),
+    publishedAt:String(raw?.publishedAt || new Date().toISOString()),
+    image:typeof raw?.image === 'string' ? raw.image : undefined,
+    lat:typeof raw?.lat === 'number' ? raw.lat : undefined,
+    lng:typeof raw?.lng === 'number' ? raw.lng : undefined,
+    country:typeof raw?.country === 'string' ? raw.country : undefined,
+    actors:Array.isArray(raw?.actors) ? raw.actors.filter((a:any)=>typeof a === 'string') : [],
+    tags:Array.isArray(raw?.tags) ? raw.tags.filter((t:any)=>typeof t === 'string') : [],
+    severity:Number.isFinite(Number(raw?.severity)) ? Number(raw.severity) : 1
+  };
+}
+
 export default function OntologyView(){
   const ref = useRef<HTMLDivElement>(null);
   const [events,setEvents] = useState<IntelEvent[]>([]);
+  const [selectedId,setSelectedId] = useState<string>('');
   const [error,setError] = useState('');
+
+  const selected = events.find(e=>e.id === selectedId) || events[0] || null;
 
   useEffect(()=>{
     fetch('/api/rss', { headers: { accept: 'application/json' } })
@@ -18,7 +39,11 @@ export default function OntologyView(){
         if(!contentType.includes('application/json')) throw new Error('RSS API devolvió una respuesta no JSON');
         return r.json();
       })
-      .then(d=>setEvents(Array.isArray(d?.events) ? d.events : []))
+      .then(d=>{
+        const normalized = Array.isArray(d?.events) ? d.events.map(normalizeEvent) : [];
+        setEvents(normalized);
+        if(normalized[0]) setSelectedId(normalized[0].id);
+      })
       .catch(err=>{
         console.error('Ontology RSS error', err);
         setEvents([]);
@@ -28,7 +53,10 @@ export default function OntologyView(){
 
   useEffect(()=>{
     if(!ref.current) return;
-    const g = buildOntology(events);
+    ref.current.innerHTML = '';
+    if(!selected) return;
+
+    const g = buildOntology([selected]);
     const cy = cytoscape({
       container: ref.current,
       elements: [
@@ -36,16 +64,45 @@ export default function OntologyView(){
         ...g.edges.map(e=>({data:{id:e.id,source:e.source,target:e.target,label:e.type}}))
       ],
       style:[
-        { selector:'node', style:{ 'background-color':'data(color)','label':'data(label)','color':'#e2e8f0','font-size':9,'text-wrap':'wrap','text-max-width':110 } as any },
-        { selector:'edge', style:{ 'line-color':'#334155','target-arrow-color':'#334155','target-arrow-shape':'triangle','curve-style':'bezier','width':1,'label':'data(label)','font-size':7,'color':'#64748b' } as any }
+        { selector:'node', style:{ 'background-color':'data(color)','label':'data(label)','color':'#e2e8f0','font-size':10,'text-wrap':'wrap','text-max-width':140,'width':38,'height':38 } as any },
+        { selector:'node[type = "Event"]', style:{ 'width':58,'height':58,'font-size':11,'border-width':2,'border-color':'#fbbf24' } as any },
+        { selector:'edge', style:{ 'line-color':'#334155','target-arrow-color':'#334155','target-arrow-shape':'triangle','curve-style':'bezier','width':1.5,'label':'data(label)','font-size':8,'color':'#64748b','text-background-color':'#0a0e17','text-background-opacity':0.8,'text-background-padding':'2px' } as any }
       ],
-      layout:{name:'cose',animate:false,padding:30}
+      layout:{name:'cose',animate:false,padding:45}
     });
+    cy.fit(undefined, 55);
     return ()=>cy.destroy();
-  },[events]);
+  },[selected?.id]);
 
-  return <div className="h-full flex flex-col gap-3"><div><h2 className="text-xl font-bold text-gray-100">Ontology Live</h2>
-  <p className="text-xs text-gray-500">Event → Actor / Location / Source</p></div>
-  {error && <div className="aegis-card p-3 text-sm text-amber-300">{error}</div>}
-  <div ref={ref} className="aegis-card flex-1 min-h-[650px]" /></div>;
+  return <div className="ontology-live-shell">
+    <div className="ontology-live-header">
+      <div><h2>Ontology Live</h2><p>La ontología se recalcula según el evento seleccionado.</p></div>
+      {selected && <div className="ontology-selected-meta"><b>{selected.source}</b><span>{selected.country || 'Sin geolocalización'} · S{selected.severity}</span></div>}
+    </div>
+
+    {error && <div className="aegis-card p-3 text-sm text-amber-300">{error}</div>}
+
+    <div className="ontology-live-grid">
+      <aside className="ontology-event-list aegis-card">
+        <div className="ontology-list-title">Eventos</div>
+        <div className="ontology-list-scroll">
+          {events.slice(0,80).map(e=><button key={e.id} onClick={()=>setSelectedId(e.id)} className={selected?.id === e.id ? 'is-selected' : ''}>
+            <small>{e.source}</small>
+            <b>{e.title}</b>
+            <span>{e.country || 'Sin ubicación'} · {e.actors.length} actores</span>
+          </button>)}
+        </div>
+      </aside>
+
+      <section className="ontology-graph-panel aegis-card">
+        {selected ? <>
+          <div className="ontology-event-summary">
+            <h3>{selected.title}</h3>
+            <p>{selected.description || 'Sin descripción disponible.'}</p>
+          </div>
+          <div ref={ref} className="ontology-graph-canvas" />
+        </> : <div className="live-empty">No hay eventos disponibles.</div>}
+      </section>
+    </div>
+  </div>;
 }
