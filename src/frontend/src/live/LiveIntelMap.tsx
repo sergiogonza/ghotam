@@ -9,13 +9,22 @@ export default function LiveIntelMap() {
   const [events, setEvents] = useState<IntelEvent[]>([]);
   const [selected, setSelected] = useState<IntelEvent | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const load = async () => {
     setLoading(true);
+    setError('');
     try {
-      const res = await fetch('/api/rss');
+      const res = await fetch('/api/rss', { headers: { accept: 'application/json' } });
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok) throw new Error(`RSS API ${res.status}`);
+      if (!contentType.includes('application/json')) throw new Error('RSS API devolvió una respuesta no JSON');
       const data = await res.json();
-      setEvents(data.events || []);
+      setEvents(Array.isArray(data?.events) ? data.events : []);
+    } catch (err) {
+      console.error('Live RSS error', err);
+      setEvents([]);
+      setError(err instanceof Error ? err.message : 'No se pudo cargar RSS');
     } finally {
       setLoading(false);
     }
@@ -30,6 +39,8 @@ export default function LiveIntelMap() {
       <div><h2>Live Intelligence Map</h2><p>RSS normalizados a objetos Event · Actor · Location · Source</p></div>
       <button onClick={load}><RefreshCcw className={loading ? 'spin' : ''} size={16}/>Actualizar</button>
     </div>
+
+    {error && <div className="aegis-card p-3 text-sm text-amber-300">{error}</div>}
 
     <div className="live-intel-grid">
       <div className="aegis-card live-map-card">
@@ -47,7 +58,7 @@ export default function LiveIntelMap() {
         {events.slice(0,40).map(e => <article key={e.id} className="aegis-card live-event-card" onClick={()=>setSelected(e)}>
           {e.image && <img src={e.image} alt="" />}
           <div><small>{e.source} · {new Date(e.publishedAt).toLocaleString()}</small><h3>{e.title}</h3>
-          <p>{e.description}</p><div className="tag-row">{e.actors.map(a=><span key={a}>{a}</span>)}</div></div>
+          <p>{e.description}</p><div className="tag-row">{(Array.isArray(e.actors) ? e.actors : []).map(a=><span key={a}>{a}</span>)}</div></div>
         </article>)}
       </div>
     </div>
@@ -56,7 +67,7 @@ export default function LiveIntelMap() {
       <div className="floating-window-header"><b>EVENT / {selected.source}</b><button onClick={()=>setSelected(null)}><X size={15}/></button></div>
       {selected.image && <img src={selected.image} className="floating-window-image" alt="" />}
       <div className="floating-window-body"><h3>{selected.title}</h3><p>{selected.description}</p>
-      <div className="tag-row">{selected.actors.map(a=><span key={a}>{a}</span>)}</div>
+      <div className="tag-row">{(Array.isArray(selected.actors) ? selected.actors : []).map(a=><span key={a}>{a}</span>)}</div>
       <a href={selected.link} target="_blank" rel="noreferrer">Abrir fuente <ExternalLink size={13}/></a></div>
     </div>}
   </div>;
