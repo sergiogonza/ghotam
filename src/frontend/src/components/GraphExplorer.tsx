@@ -4,6 +4,7 @@ import cytoscape from 'cytoscape';
 import { ExternalLink,Filter,Maximize2,Network,RefreshCcw,Search,Sparkles,Target,ZoomIn,ZoomOut } from 'lucide-react';
 import { getLiveGraph,loadLiveIntel } from '../live/legacyBridge';
 import { analyzeAll,semanticSimilarity,type IntelRecord } from '../live/analysisEngine';
+import { analyticSearchScore,matchesAnalyticQuery } from '../live/analyticSearch';
 import type { GraphData,GraphNode } from '../types';
 
 const arr=<T,>(v:unknown):T[]=>Array.isArray(v)?v as T[]:[];
@@ -18,9 +19,13 @@ export default function GraphExplorer(){
   const analyzed=useMemo(()=>analyzeAll(raw),[raw]);
   const selectedEvent=useMemo(()=>{if(!selected)return null;const id=selected.id.replace(/^EVENT:/,'').replace(/^LIVECASE:/,'');return analyzed.find(x=>x.event.id===id)||analyzed.find(x=>selected.label&&x.event.title.includes(selected.label.slice(0,40)))||null},[selected,analyzed]);
   const semanticResults=useMemo(()=>{
-    const q=query.trim().toLowerCase(); if(!q)return[];
+    const q=query.trim(); if(!q)return[];
     const seed:IntelRecord={id:'q',title:q,description:q,source:'',link:'',publishedAt:new Date().toISOString(),actors:[],tags:[],category:'geopolitics',patternFamily:'geopolitics-general',severity:1,geoConfidence:0,interestScore:0,tlp:'TLP:CLEAR'};
-    return analyzed.map(x=>{const haystack=(x.event.title+' '+x.event.description+' '+x.event.actors.join(' ')).toLowerCase();return{...x,score:semanticSimilarity(seed,x.event)+Number(haystack.includes(q))*.35}}).filter(x=>x.score>.08).sort((a,b)=>b.score-a.score).slice(0,30);
+    return analyzed
+      .map(x=>({...x,score:semanticSimilarity(seed,x.event)+analyticSearchScore(x,q)}))
+      .filter(x=>matchesAnalyticQuery(x,q)||x.score>.55)
+      .sort((a,b)=>b.score-a.score)
+      .slice(0,50);
   },[query,analyzed]);
   const related=useMemo(()=>selectedEvent?[...analyzed].filter(x=>x.event.id!==selectedEvent.event.id).map(x=>({...x,score:semanticSimilarity(selectedEvent.event,x.event)})).filter(x=>x.score>.12).sort((a,b)=>b.score-a.score).slice(0,15):[],[selectedEvent,analyzed]);
   const sources=useMemo(()=>{const m=new Map<string,{count:number;links:string[]}>();related.forEach(x=>{const s=m.get(x.event.source)||{count:0,links:[]};s.count++;if(x.event.link)s.links.push(x.event.link);m.set(x.event.source,s)});if(selectedEvent){const s=m.get(selectedEvent.event.source)||{count:0,links:[]};s.count++;if(selectedEvent.event.link)s.links.push(selectedEvent.event.link);m.set(selectedEvent.event.source,s)}return[...m.entries()].sort((a,b)=>b[1].count-a[1].count)},[related,selectedEvent]);
@@ -44,11 +49,11 @@ export default function GraphExplorer(){
   const investigate=(event:IntelRecord)=>{const id=`LIVECASE:${event.id}`;openGraph(id);navigate(`/graph/${encodeURIComponent(id)}`,{replace:true});setSelected({id:`EVENT:${event.id}`,label:event.title,type:'Event',properties:{}})};
 
   return <div className="h-full flex flex-col gap-4">
-    <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold text-gray-100 flex items-center gap-2"><Network className="w-5 h-5 text-cyan-400"/>Investigation Workspace</h2><p className="text-xs text-gray-500 mt-1">Ontology graph · semantic source discovery · provenance · related events</p></div><button onClick={()=>openGraph(exploreId)} className="flex items-center gap-2 px-3 py-2 text-xs border border-[var(--aegis-border)] rounded-lg text-gray-400"><RefreshCcw className={`w-4 h-4 ${loading?'animate-spin':''}`}/>Refresh</button></div>
+    <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold text-gray-100 flex items-center gap-2"><Network className="w-5 h-5 text-cyan-400"/>Investigation Workspace</h2><p className="text-xs text-gray-500 mt-1">Ontology graph · analytic search · provenance · related events</p></div><button onClick={()=>openGraph(exploreId)} className="flex items-center gap-2 px-3 py-2 text-xs border border-[var(--aegis-border)] rounded-lg text-gray-400"><RefreshCcw className={`w-4 h-4 ${loading?'animate-spin':''}`}/>Refresh</button></div>
 
-    <div className="aegis-card p-3 flex items-center gap-3"><Search className="w-4 h-4 text-gray-500"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar semánticamente: actor, país, crisis, nuclear, elecciones, diplomacia..." className="flex-1 bg-transparent outline-none text-sm text-gray-200"/><Filter className="w-4 h-4 text-gray-600"/><button onClick={()=>setShowSources(v=>!v)} className="text-xs text-cyan-400">{showSources?'Hide':'Show'} sources</button></div>
+    <div className="aegis-card p-3"><div className="flex items-center gap-3"><Search className="w-4 h-4 text-gray-500"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search actor, country, black swan, early warning, established, high risk..." className="flex-1 bg-transparent outline-none text-sm text-gray-200"/><Filter className="w-4 h-4 text-gray-600"/><button onClick={()=>setShowSources(v=>!v)} className="text-xs text-cyan-400">{showSources?'Hide':'Show'} sources</button></div><div className="mt-2 flex flex-wrap gap-1 text-[9px] text-slate-600">{['black swan','early warning','established','anomalous','high risk','plausible','high momentum'].map(t=><button key={t} onClick={()=>setQuery(t)} className="px-2 py-1 border border-white/5 hover:border-cyan-500/30 hover:text-cyan-400">{t}</button>)}</div></div>
 
-    {query&&<div className="aegis-card p-4"><h3 className="text-xs uppercase tracking-wider text-gray-500 mb-3">Semantic results · {semanticResults.length}</h3><div className="grid grid-cols-2 gap-2 max-h-56 overflow-auto">{semanticResults.map(({event,analysis,score})=><button key={event.id} onClick={()=>investigate(event)} className="text-left p-3 rounded-lg border border-white/5 hover:border-cyan-500/30 bg-white/[.02]"><p className="text-xs text-gray-200 line-clamp-2">{event.title}</p><p className="text-[9px] text-gray-600 mt-1">{event.source} · {analysis.patternFamily} · semantic {Math.round(score*100)} · <span className={riskColor(analysis.riskScore)}>risk {analysis.riskScore.toFixed(1)}</span></p></button>)}</div></div>}
+    {query&&<div className="aegis-card p-4"><h3 className="text-xs uppercase tracking-wider text-gray-500 mb-3">Analytic results · {semanticResults.length}</h3><div className="grid grid-cols-2 gap-2 max-h-64 overflow-auto">{semanticResults.map(({event,analysis,score})=><button key={event.id} onClick={()=>investigate(event)} className="text-left p-3 rounded-lg border border-white/5 hover:border-cyan-500/30 bg-white/[.02]"><p className="text-xs text-gray-200 line-clamp-2">{event.title}</p><p className="text-[9px] text-gray-600 mt-1">{event.source} · {analysis.patternFamily} · {analysis.signalClass} · {analysis.riskLevel} {analysis.riskScore.toFixed(1)} · score {score.toFixed(1)}</p></button>)}</div></div>}
 
     <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-4 flex-1 min-h-0"><section className="aegis-card relative min-h-[620px] overflow-hidden"><div className="absolute top-3 right-3 z-10 flex gap-1"><button onClick={()=>cyRef.current?.zoom(cyRef.current.zoom()*1.2)} className="p-2 bg-black/40 rounded"><ZoomIn className="w-4 h-4"/></button><button onClick={()=>cyRef.current?.zoom(cyRef.current.zoom()*.8)} className="p-2 bg-black/40 rounded"><ZoomOut className="w-4 h-4"/></button><button onClick={()=>cyRef.current?.fit(undefined,40)} className="p-2 bg-black/40 rounded"><Maximize2 className="w-4 h-4"/></button></div><div ref={ref} className="w-full h-full min-h-[620px]"/></section>
 
