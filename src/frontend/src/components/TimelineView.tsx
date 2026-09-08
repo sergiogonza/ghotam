@@ -19,6 +19,10 @@ const SEVERITY_LABELS = ['Info', 'Low', 'Medium', 'High', 'Critical', 'Emergency
 const SEVERITY_COLORS = ['#64748b', '#22d3ee', '#eab308', '#f97316', '#ef4444', '#dc2626'];
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] || c));
 
+function timelineItemId(eventId: string, index: number) {
+  return `TL:${eventId}:${index}`;
+}
+
 export default function TimelineView() {
   const { data: events = [], isLoading } = useEvents();
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -61,12 +65,15 @@ export default function TimelineView() {
       })),
     );
 
-    const items = new DataSet(filtered.map(evt => {
+    const originalByTimelineId = new Map<string, string>();
+    const items = new DataSet(filtered.map((evt, index) => {
       const sev = Math.max(0, Math.min(5, Number(evt.severity) || 0));
       const description = evt.description || 'Event';
       const short = description.length > 80 ? description.slice(0, 80) + '…' : description;
+      const uniqueId = timelineItemId(String(evt.eventId || 'event'), index);
+      originalByTimelineId.set(uniqueId, String(evt.eventId || ''));
       return {
-        id: evt.eventId,
+        id: uniqueId,
         group: evt.eventType || 'OpenSourceIntel',
         content: `<span style="font-size:11px">${esc(short)}</span>`,
         start: new Date(evt.timestamp),
@@ -99,7 +106,9 @@ export default function TimelineView() {
     });
 
     timeline.on('select', (props: { items: string[] }) => {
-      if (props.items.length > 0) navigate(`/graph/${props.items[0]}`);
+      const selectedTimelineId = String(props.items?.[0] || '');
+      const originalEventId = originalByTimelineId.get(selectedTimelineId);
+      if (originalEventId) navigate(`/graph/${encodeURIComponent(originalEventId)}`);
     });
 
     tlInstanceRef.current = timeline;
