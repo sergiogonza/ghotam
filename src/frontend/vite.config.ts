@@ -10,6 +10,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api/rss': { target: 'http://localhost:8788', changeOrigin: true },
+      '/api/lm': { target: 'http://localhost:8789', changeOrigin: true },
       '/api': { target: 'http://localhost:5000', changeOrigin: true },
       '/hub': { target: 'http://localhost:5000', ws: true },
     },
