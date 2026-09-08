@@ -9,7 +9,7 @@
 
 [[redirects]]
   from = "/api/rss"
-  to = "/.netlify/functions/rss"
+  to = "/.netlify/functions/geo-rss"
   status = 200
 
 [[redirects]]
