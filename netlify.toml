@@ -1,8 +1,10 @@
 [build]
-  base = "src/frontend"
-  command = "npm run build"
-  publish = "dist"
-  functions = "../../netlify/functions"
+  command = "npm --prefix src/frontend run build"
+  publish = "src/frontend/dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
 
 [[redirects]]
   from = "/api/rss"
