@@ -4,6 +4,7 @@ import { buildOntology } from './ontology';
 import type { IntelEvent } from './types';
 
 const colors: Record<string,string> = { Event:'#f59e0b', Actor:'#06b6d4', Location:'#f472b6', Source:'#8b5cf6' };
+const safeStrings = (value: unknown) => Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 
 function normalizeEvent(raw:any, index:number): IntelEvent {
   return {
@@ -17,8 +18,8 @@ function normalizeEvent(raw:any, index:number): IntelEvent {
     lat:typeof raw?.lat === 'number' ? raw.lat : undefined,
     lng:typeof raw?.lng === 'number' ? raw.lng : undefined,
     country:typeof raw?.country === 'string' ? raw.country : undefined,
-    actors:Array.isArray(raw?.actors) ? raw.actors.filter((a:any)=>typeof a === 'string') : [],
-    tags:Array.isArray(raw?.tags) ? raw.tags.filter((t:any)=>typeof t === 'string') : [],
+    actors:safeStrings(raw?.actors),
+    tags:safeStrings(raw?.tags),
     severity:Number.isFinite(Number(raw?.severity)) ? Number(raw.severity) : 1
   };
 }
@@ -29,7 +30,8 @@ export default function OntologyView(){
   const [selectedId,setSelectedId] = useState<string>('');
   const [error,setError] = useState('');
 
-  const selected = events.find(e=>e.id === selectedId) || events[0] || null;
+  const safeEvents = Array.isArray(events) ? events : [];
+  const selected = safeEvents.find(e=>e?.id === selectedId) || safeEvents[0] || null;
 
   useEffect(()=>{
     fetch('/api/rss', { headers: { accept: 'application/json' } })
@@ -40,7 +42,8 @@ export default function OntologyView(){
         return r.json();
       })
       .then(d=>{
-        const normalized = Array.isArray(d?.events) ? d.events.map(normalizeEvent) : [];
+        const rawEvents = Array.isArray(d?.events) ? d.events : [];
+        const normalized = rawEvents.map((item:any,index:number)=>normalizeEvent(item,index));
         setEvents(normalized);
         if(normalized[0]) setSelectedId(normalized[0].id);
       })
@@ -57,11 +60,13 @@ export default function OntologyView(){
     if(!selected) return;
 
     const g = buildOntology([selected]);
+    const nodes = Array.isArray(g?.nodes) ? g.nodes : [];
+    const edges = Array.isArray(g?.edges) ? g.edges : [];
     const cy = cytoscape({
       container: ref.current,
       elements: [
-        ...g.nodes.map(n=>({data:{id:n.id,label:n.label,type:n.type,color:colors[n.type]}})),
-        ...g.edges.map(e=>({data:{id:e.id,source:e.source,target:e.target,label:e.type}}))
+        ...nodes.map(n=>({data:{id:n.id,label:n.label,type:n.type,color:colors[n.type]}})),
+        ...edges.map(e=>({data:{id:e.id,source:e.source,target:e.target,label:e.type}}))
       ],
       style:[
         { selector:'node', style:{ 'background-color':'data(color)','label':'data(label)','color':'#e2e8f0','font-size':10,'text-wrap':'wrap','text-max-width':140,'width':38,'height':38 } as any },
@@ -86,11 +91,14 @@ export default function OntologyView(){
       <aside className="ontology-event-list aegis-card">
         <div className="ontology-list-title">Eventos</div>
         <div className="ontology-list-scroll">
-          {events.slice(0,80).map(e=><button key={e.id} onClick={()=>setSelectedId(e.id)} className={selected?.id === e.id ? 'is-selected' : ''}>
-            <small>{e.source}</small>
-            <b>{e.title}</b>
-            <span>{e.country || 'Sin ubicación'} · {e.actors.length} actores</span>
-          </button>)}
+          {safeEvents.slice(0,80).map(e=>{
+            const actorCount = safeStrings(e?.actors).length;
+            return <button key={e.id} onClick={()=>setSelectedId(e.id)} className={selected?.id === e.id ? 'is-selected' : ''}>
+              <small>{e.source}</small>
+              <b>{e.title}</b>
+              <span>{e.country || 'Sin ubicación'} · {actorCount} actores</span>
+            </button>;
+          })}
         </div>
       </aside>
 
