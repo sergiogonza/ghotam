@@ -21,7 +21,7 @@ export default function RiskPropagation(){
 
   async function run(id:string,risk?:number){
     const nodeId=id.trim(); if(!nodeId)return; setLoading(true);setError('');setSelected(null);
-    try{const live=await getLiveGraph(nodeId,maxDepth);const nodes=arr<GraphNode>(live?.nodes),edges=arr<any>(live?.edges);if(!nodes.length)throw new Error('No se encontraron relaciones para este nodo.');setGraph({nodes,edges});setSourceRisk(risk ?? sourceRisk || 5)}
+    try{const live=await getLiveGraph(nodeId,maxDepth);const nodes=arr<GraphNode>(live?.nodes),edges=arr<any>(live?.edges);if(!nodes.length)throw new Error('No se encontraron relaciones para este nodo.');setGraph({nodes,edges});setSourceRisk(risk!==undefined?risk:(sourceRisk||5))}
     catch(e:any){setGraph({nodes:[],edges:[]});setError(e?.message||'No se pudo calcular la propagación.')}finally{setLoading(false)}
   }
 
