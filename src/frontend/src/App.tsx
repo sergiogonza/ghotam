@@ -16,33 +16,18 @@ const PersonsView = lazy(() => import('./components/PersonsView'));
 const EntityInvestigation = lazy(() => import('./components/EntityInvestigation'));
 const CommandCenter = lazy(() => import('./components/CommandCenter'));
 const RiskPropagation = lazy(() => import('./components/RiskPropagation'));
+const AdminEvents = lazy(() => import('./components/AdminEvents'));
 
 const legacy = (node: ReactNode) => (
-  <Suspense fallback={<div className="aegis-card p-4 text-sm text-gray-400">Cargando módulo…</div>}>
-    {node}
-  </Suspense>
+  <Suspense fallback={<div className="aegis-card p-4 text-sm text-gray-400">Cargando módulo…</div>}>{node}</Suspense>
 );
 
-export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<LiveIntelMap />} />
-        <Route path="live" element={<LiveIntelMap />} />
-        <Route path="ontology" element={<OntologyView />} />
-        <Route path="dashboard" element={legacy(<Dashboard />)} />
-        <Route path="graph" element={legacy(<GraphExplorer />)} />
-        <Route path="graph/:nodeId" element={legacy(<GraphExplorer />)} />
-        <Route path="map" element={legacy(<MapView />)} />
-        <Route path="cases" element={legacy(<CasesView />)} />
-        <Route path="events" element={legacy(<EventsView />)} />
-        <Route path="facilities" element={legacy(<FacilitiesView />)} />
-        <Route path="persons" element={legacy(<PersonsView />)} />
-        <Route path="timeline" element={legacy(<TimelineView />)} />
-        <Route path="investigate/:entityType/:entityId" element={legacy(<EntityInvestigation />)} />
-        <Route path="command-center" element={legacy(<CommandCenter />)} />
-        <Route path="risk-propagation" element={legacy(<RiskPropagation />)} />
-      </Route>
-    </Routes>
-  );
+export default function App(){
+  return <Routes><Route path="/" element={<Layout/>}>
+    <Route index element={<LiveIntelMap/>}/><Route path="live" element={<LiveIntelMap/>}/><Route path="ontology" element={<OntologyView/>}/>
+    <Route path="dashboard" element={legacy(<Dashboard/>)}/><Route path="admin" element={legacy(<AdminEvents/>)}/>
+    <Route path="graph" element={legacy(<GraphExplorer/>)}/><Route path="graph/:nodeId" element={legacy(<GraphExplorer/>)}/><Route path="map" element={legacy(<MapView/>)}/>
+    <Route path="cases" element={legacy(<CasesView/>)}/><Route path="events" element={legacy(<EventsView/>)}/><Route path="facilities" element={legacy(<FacilitiesView/>)}/><Route path="persons" element={legacy(<PersonsView/>)}/><Route path="timeline" element={legacy(<TimelineView/>)}/>
+    <Route path="investigate/:entityType/:entityId" element={legacy(<EntityInvestigation/>)}/><Route path="command-center" element={legacy(<CommandCenter/>)}/><Route path="risk-propagation" element={legacy(<RiskPropagation/>)}/>
+  </Route></Routes>;
 }
