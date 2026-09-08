@@ -1,137 +1,92 @@
-import { useNavigate } from 'react-router-dom';
-import {
-  ShieldAlert,
-  Activity,
-  Building2,
-  Users,
-  AlertTriangle,
-  TrendingUp,
-} from 'lucide-react';
-import { useDashboardStats, useRiskCases, useEvents } from '../hooks/useApi';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, AlertTriangle, Globe2, Network, RefreshCcw, ShieldCheck, TrendingUp } from 'lucide-react';
 
-const SEVERITY_COLORS = ['#94a3b8', '#60a5fa', '#fbbf24', '#f97316', '#ef4444'];
-const TYPE_COLORS = ['#ef4444', '#f97316', '#a855f7', '#06b6d4', '#10b981'];
+type LiveEvent = {
+  id: string; title: string; description: string; source: string; publishedAt: string;
+  country?: string; lat?: number; lng?: number; actors: string[]; severity: number;
+  geoConfidence: number; interestScore: number; tlp: 'TLP:CLEAR'|'TLP:GREEN'|'TLP:AMBER'|'TLP:RED';
+};
 
-export default function Dashboard() {
-  const { data: stats, isLoading } = useDashboardStats();
-  const { data: cases } = useRiskCases();
-  const { data: events } = useEvents({ minSeverity: 3 });
-  const navigate = useNavigate();
+type QuadrantKey = 'plausible-probable'|'plausible-unlikely'|'weak-probable'|'weak-unlikely';
 
-  const eventsByType = Array.isArray((stats as any)?.eventsByType) ? (stats as any).eventsByType : [];
-  const eventsBySeverity = Array.isArray((stats as any)?.eventsBySeverity) ? (stats as any).eventsBySeverity : [];
-  const safeCases = Array.isArray(cases) ? cases : [];
-  const safeEvents = Array.isArray(events) ? events : [];
+const clamp = (n:number) => Math.max(0, Math.min(1, n));
+const safeArray = <T,>(v:unknown):T[] => Array.isArray(v) ? v as T[] : [];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-pulse text-cyan-400">Loading intelligence data...</div>
-      </div>
-    );
-  }
+function normalizeEvent(raw:any, index:number):LiveEvent {
+  const tlpRaw = String(raw?.tlp || 'TLP:CLEAR').toUpperCase();
+  const tlp = ['TLP:CLEAR','TLP:GREEN','TLP:AMBER','TLP:RED'].includes(tlpRaw) ? tlpRaw as LiveEvent['tlp'] : 'TLP:CLEAR';
+  return {
+    id:String(raw?.id || `event-${index}`), title:String(raw?.title || 'Evento sin título'), description:String(raw?.description || ''),
+    source:String(raw?.source || 'Fuente desconocida'), publishedAt:String(raw?.publishedAt || new Date().toISOString()),
+    country:typeof raw?.country === 'string' ? raw.country : undefined,
+    lat:Number.isFinite(Number(raw?.lat)) ? Number(raw.lat) : undefined, lng:Number.isFinite(Number(raw?.lng)) ? Number(raw.lng) : undefined,
+    actors:safeArray<string>(raw?.actors).filter(a=>typeof a==='string'), severity:Number.isFinite(Number(raw?.severity)) ? Number(raw.severity) : 1,
+    geoConfidence:Number.isFinite(Number(raw?.geoConfidence)) ? clamp(Number(raw.geoConfidence)) : (raw?.country ? .72 : 0),
+    interestScore:Number.isFinite(Number(raw?.interestScore)) ? Number(raw.interestScore) : Number(raw?.severity || 1), tlp,
+  };
+}
 
-  const statCards = [
-    { label: 'Facilities', value: (stats as any)?.totalFacilities ?? 0, icon: Building2, color: 'text-blue-400', bgColor: 'bg-blue-500/10', route: '/facilities' },
-    { label: 'Total Events', value: (stats as any)?.totalEvents ?? 0, icon: Activity, color: 'text-cyan-400', bgColor: 'bg-cyan-500/10', route: '/events' },
-    { label: 'Open Cases', value: (stats as any)?.openCases ?? 0, icon: ShieldAlert, color: 'text-red-400', bgColor: 'bg-red-500/10', route: '/cases' },
-    { label: 'Critical Alerts', value: (stats as any)?.criticalAlerts ?? 0, icon: AlertTriangle, color: 'text-orange-400', bgColor: 'bg-orange-500/10', route: '/events?minSeverity=4' },
-    { label: 'Persons Tracked', value: (stats as any)?.totalPersons ?? 0, icon: Users, color: 'text-purple-400', bgColor: 'bg-purple-500/10', route: '/persons' },
+function scores(e:LiveEvent) {
+  const ageHours = Math.max(0,(Date.now()-new Date(e.publishedAt).getTime())/36e5);
+  const recency = clamp(1-ageHours/72);
+  const plausibility = clamp(.2 + e.geoConfidence*.35 + Math.min(e.actors.length/4,1)*.2 + (e.source? .15:0) + (e.description.length>80?.1:0));
+  const probability = clamp(.12 + clamp(e.severity/10)*.34 + clamp(e.interestScore/20)*.32 + recency*.22);
+  return { plausibility, probability };
+}
+
+function quadrant(e:LiveEvent):QuadrantKey {
+  const s=scores(e); const plausible=s.plausibility>=.55; const probable=s.probability>=.55;
+  if(plausible&&probable) return 'plausible-probable';
+  if(plausible&&!probable) return 'plausible-unlikely';
+  if(!plausible&&probable) return 'weak-probable';
+  return 'weak-unlikely';
+}
+
+const tlpStyles:Record<LiveEvent['tlp'],string>={
+  'TLP:CLEAR':'border-gray-500/30 text-gray-300 bg-gray-500/10',
+  'TLP:GREEN':'border-green-500/30 text-green-300 bg-green-500/10',
+  'TLP:AMBER':'border-amber-500/30 text-amber-300 bg-amber-500/10',
+  'TLP:RED':'border-red-500/30 text-red-300 bg-red-500/10',
+};
+
+export default function Dashboard(){
+  const [events,setEvents]=useState<LiveEvent[]>([]); const [loading,setLoading]=useState(false); const [error,setError]=useState('');
+  const load=async()=>{setLoading(true);setError('');try{const r=await fetch('/api/rss',{headers:{accept:'application/json'}});if(!r.ok)throw new Error(`RSS API ${r.status}`);const d=await r.json();setEvents(safeArray<any>(d?.events).map(normalizeEvent));}catch(e){setEvents([]);setError(e instanceof Error?e.message:'RSS unavailable');}finally{setLoading(false);}};
+  useEffect(()=>{load();const id=setInterval(load,300000);return()=>clearInterval(id);},[]);
+
+  const mapped=useMemo(()=>events.filter(e=>typeof e.lat==='number'&&typeof e.lng==='number'),[events]);
+  const critical=useMemo(()=>events.filter(e=>e.severity>=7),[events]);
+  const highInterest=useMemo(()=>[...events].sort((a,b)=>b.interestScore-a.interestScore).slice(0,12),[events]);
+  const actors=useMemo(()=>{const m=new Map<string,number>();events.forEach(e=>e.actors.forEach(a=>m.set(a,(m.get(a)||0)+1)));return [...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);},[events]);
+  const quadrants=useMemo(()=>({
+    'plausible-probable':events.filter(e=>quadrant(e)==='plausible-probable'),
+    'plausible-unlikely':events.filter(e=>quadrant(e)==='plausible-unlikely'),
+    'weak-probable':events.filter(e=>quadrant(e)==='weak-probable'),
+    'weak-unlikely':events.filter(e=>quadrant(e)==='weak-unlikely'),
+  }),[events]);
+  const tlpCounts=useMemo(()=>({
+    'TLP:CLEAR':events.filter(e=>e.tlp==='TLP:CLEAR').length,
+    'TLP:GREEN':events.filter(e=>e.tlp==='TLP:GREEN').length,
+    'TLP:AMBER':events.filter(e=>e.tlp==='TLP:AMBER').length,
+    'TLP:RED':events.filter(e=>e.tlp==='TLP:RED').length,
+  }),[events]);
+
+  const cards=[
+    {label:'Live Events',value:events.length,icon:Activity},{label:'Geolocated',value:mapped.length,icon:Globe2},{label:'Critical',value:critical.length,icon:AlertTriangle},{label:'Actors',value:actors.length,icon:Network},{label:'High Interest',value:events.filter(e=>e.interestScore>=10).length,icon:TrendingUp},
   ];
 
-  return (
-    <div className="space-y-6 animate-slide-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-100">Intelligence Dashboard</h2>
-          <p className="text-sm text-gray-500 mt-1">Legacy AEGIS dashboard · backend data appears when the .NET API is connected</p>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30">
-          <TrendingUp className="w-4 h-4 text-green-400" />
-          <span className="text-xs text-green-400">Frontend available</span>
-        </div>
-      </div>
+  const Q=({title,subtitle,items,accent}:{title:string;subtitle:string;items:LiveEvent[];accent:string})=><div className={`rounded-xl border ${accent} p-3 min-h-[180px]`}><div className="flex items-center justify-between"><div><b className="text-xs text-gray-200">{title}</b><p className="text-[10px] text-gray-600 mt-0.5">{subtitle}</p></div><span className="text-lg font-bold text-gray-200">{items.length}</span></div><div className="mt-3 space-y-2">{items.slice(0,3).map(e=><div key={e.id} className="text-[11px] text-gray-400 border-t border-white/5 pt-2"><span className="text-gray-200 line-clamp-1">{e.title}</span><span className="text-[9px] text-gray-600">{e.country||'Sin ubicación'} · S{e.severity} · {e.source}</span></div>)}</div></div>;
 
-      <div className="grid grid-cols-5 gap-4">
-        {statCards.map((card) => (
-          <div key={card.label} className="aegis-card aegis-card-hover p-4 cursor-pointer" onClick={() => navigate(card.route)}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-gray-500 uppercase tracking-wider">{card.label}</span>
-              <div className={`w-8 h-8 rounded-lg ${card.bgColor} flex items-center justify-center`}><card.icon className={`w-4 h-4 ${card.color}`} /></div>
-            </div>
-            <p className="text-3xl font-bold text-gray-100">{card.value}</p>
-          </div>
-        ))}
-      </div>
+  return <div className="space-y-6 animate-slide-in">
+    <div className="flex items-center justify-between"><div><h2 className="text-2xl font-bold text-gray-100">Geopolitical Intelligence Dashboard</h2><p className="text-sm text-gray-500 mt-1">RSS live · TLP handling · prospective signal matrix · ontology-ready</p></div><button onClick={load} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--aegis-border)] text-xs text-gray-400"><RefreshCcw className={`w-4 h-4 ${loading?'animate-spin':''}`}/>Refresh</button></div>
+    {error&&<div className="aegis-card p-3 text-xs text-amber-300">{error}</div>}
 
-      <div className="grid grid-cols-2 gap-6">
-        <div className="aegis-card p-5">
-          <h3 className="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider">Events by Type</h3>
-          {eventsByType.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={eventsByType}>
-                <XAxis dataKey="type" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#1e293b' }} tickLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#1e293b' }} tickLine={false} />
-                <Tooltip contentStyle={{ background: '#1a2332', border: '1px solid #1e293b', borderRadius: 8, color: '#e2e8f0' }} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>{eventsByType.map((_: any, i: number) => <Cell key={i} fill={TYPE_COLORS[i % TYPE_COLORS.length]} />)}</Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <div className="h-[220px] flex items-center justify-center text-xs text-gray-600">Backend .NET no conectado en este despliegue.</div>}
-        </div>
+    <div className="grid grid-cols-5 gap-4">{cards.map(c=><div key={c.label} className="aegis-card p-4"><div className="flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider text-gray-500">{c.label}</span><c.icon className="w-4 h-4 text-cyan-400"/></div><p className="text-3xl font-bold text-gray-100 mt-3">{c.value}</p></div>)}</div>
 
-        <div className="aegis-card p-5">
-          <h3 className="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wider">Severity Distribution</h3>
-          {eventsBySeverity.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={eventsBySeverity} dataKey="count" nameKey="severity" cx="50%" cy="50%" innerRadius={50} outerRadius={80} strokeWidth={0}>
-                  {eventsBySeverity.map((_: any, i: number) => <Cell key={i} fill={SEVERITY_COLORS[i % SEVERITY_COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={{ background: '#1a2332', border: '1px solid #1e293b', borderRadius: 8, color: '#e2e8f0' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : <div className="h-[220px] flex items-center justify-center text-xs text-gray-600">Sin datos del backend heredado.</div>}
-        </div>
-      </div>
+    <div className="aegis-card p-5"><div className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-semibold text-gray-200">Traffic Light Protocol · TLP 2.0</h3><p className="text-xs text-gray-600 mt-1">Handling/distribution label, not severity. Public RSS enters as TLP:CLEAR unless a source explicitly provides another valid label.</p></div><ShieldCheck className="w-5 h-5 text-cyan-400"/></div><div className="grid grid-cols-4 gap-3 mt-4">{(['TLP:CLEAR','TLP:GREEN','TLP:AMBER','TLP:RED'] as LiveEvent['tlp'][]).map(t=><div key={t} className={`rounded-lg border p-3 ${tlpStyles[t]}`}><p className="text-[10px] font-mono">{t}</p><p className="text-2xl font-bold mt-1">{tlpCounts[t]}</p></div>)}</div></div>
 
-      <div className="aegis-card p-5">
-        <div className="flex items-center justify-between mb-4"><h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Active Risk Cases</h3><button onClick={() => navigate('/cases')} className="text-xs text-cyan-400 hover:text-cyan-300">View all →</button></div>
-        <div className="space-y-3">
-          {safeCases.slice(0, 10).map((c) => (
-            <div key={c.caseId} onClick={() => navigate(`/graph/${c.caseId}`)} className="flex items-center gap-4 p-3 rounded-lg bg-[var(--aegis-surface-2)] hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-red-500/30">
-              <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center"><ShieldAlert className="w-5 h-5 text-red-400" /></div>
-              <div className="flex-1"><p className="text-sm font-medium text-gray-200">{c.title}</p><p className="text-xs text-gray-500 mt-0.5">{c.description}</p></div>
-              <div className="text-right"><div className="text-sm font-bold text-red-400">{Number(c.riskScore || 0).toFixed(1)}</div><div className="text-xs text-gray-500">Risk Score</div></div>
-            </div>
-          ))}
-          {safeCases.length === 0 && <div className="text-xs text-gray-600">No hay casos porque el backend .NET no está disponible en Netlify.</div>}
-        </div>
-      </div>
+    <div className="aegis-card p-5"><div className="mb-4"><h3 className="text-sm font-semibold text-gray-200">Prospective Quadrants</h3><p className="text-xs text-gray-600 mt-1">Heuristic signal only — plausibility uses evidence quality; probability uses severity, interest and recency. It is not a factual forecast.</p></div><div className="grid grid-cols-[82px_1fr_1fr] gap-3 items-stretch"><div></div><div className="text-center text-[10px] text-gray-500 uppercase">Poco probable</div><div className="text-center text-[10px] text-gray-500 uppercase">Probable</div><div className="flex items-center justify-center text-[10px] text-gray-500 uppercase [writing-mode:vertical-rl] rotate-180">Plausible</div><Q title="Plausible / Poco probable" subtitle="Buena evidencia, baja señal de ocurrencia" items={quadrants['plausible-unlikely']} accent="border-cyan-500/20 bg-cyan-500/5"/><Q title="Plausible / Probable" subtitle="Alta prioridad analítica" items={quadrants['plausible-probable']} accent="border-red-500/30 bg-red-500/5"/><div className="flex items-center justify-center text-[10px] text-gray-500 uppercase [writing-mode:vertical-rl] rotate-180">Poco plausible</div><Q title="Poco plausible / Poco probable" subtitle="Señal débil / baja evidencia" items={quadrants['weak-unlikely']} accent="border-gray-500/20 bg-gray-500/5"/><Q title="Poco plausible / Probable" subtitle="Señal alta pero evidencia insuficiente" items={quadrants['weak-probable']} accent="border-amber-500/30 bg-amber-500/5"/></div></div>
 
-      <div className="aegis-card p-5">
-        <div className="flex items-center justify-between mb-4"><h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Recent Critical Events</h3><button onClick={() => navigate('/events')} className="text-xs text-cyan-400 hover:text-cyan-300">View all →</button></div>
-        <div className="space-y-2">
-          {safeEvents.slice(0, 10).map((evt) => (
-            <div key={evt.eventId} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors" onClick={() => navigate(`/graph/${evt.eventId}`)}>
-              <div className={`w-1.5 h-8 rounded-full ${evt.severity >= 5 ? 'bg-red-500' : evt.severity >= 4 ? 'bg-orange-500' : 'bg-yellow-500'}`} />
-              <div className="flex-1"><p className="text-sm text-gray-300">{evt.description}</p><p className="text-xs text-gray-600 mt-0.5">{evt.eventType} · {new Date(evt.timestamp).toLocaleString()}</p></div>
-              <span className={`text-xs font-mono font-bold severity-${evt.severity}`}>SEV-{evt.severity}</span>
-            </div>
-          ))}
-          {safeEvents.length === 0 && <div className="text-xs text-gray-600">Los eventos geopolíticos en vivo están disponibles en Live Intelligence.</div>}
-        </div>
-      </div>
-    </div>
-  );
+    <div className="grid grid-cols-2 gap-6"><div className="aegis-card p-5"><h3 className="text-sm font-semibold text-gray-200 mb-3">Top Actors</h3><div className="space-y-2">{actors.map(([name,count],i)=><div key={name} className="flex items-center gap-3"><span className="text-[10px] text-gray-600 w-5">{i+1}</span><div className="flex-1 h-1.5 bg-white/5 rounded overflow-hidden"><div className="h-full bg-cyan-500/50" style={{width:`${Math.max(8,(count/(actors[0]?.[1]||1))*100)}%`}}/></div><span className="text-xs text-gray-300 w-28 truncate">{name}</span><span className="text-xs text-gray-600">{count}</span></div>)}</div></div><div className="aegis-card p-5"><h3 className="text-sm font-semibold text-gray-200 mb-3">High-interest Events</h3><div className="space-y-2 max-h-72 overflow-auto">{highInterest.map(e=>{const s=scores(e);return <div key={e.id} className="border-b border-white/5 pb-2"><div className="flex items-start justify-between gap-3"><p className="text-xs text-gray-300">{e.title}</p><span className={`text-[9px] px-1.5 py-0.5 rounded border ${tlpStyles[e.tlp]}`}>{e.tlp}</span></div><p className="text-[10px] text-gray-600 mt-1">{e.country||'Sin ubicación'} · S{e.severity} · plaus. {Math.round(s.plausibility*100)}% · prob. {Math.round(s.probability*100)}%</p></div>})}</div></div></div>
+  </div>;
 }
