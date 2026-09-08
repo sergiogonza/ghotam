@@ -1,19 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
-import { X, ExternalLink, RefreshCcw, MapPin, Newspaper } from 'lucide-react';
+import { X, ExternalLink, RefreshCcw, MapPin, Newspaper, GripHorizontal } from 'lucide-react';
 import type { IntelEvent } from './types';
 
 const severityColor = (s:number) => s >= 8 ? '#ef4444' : s >= 5 ? '#f59e0b' : '#22c55e';
 const safeStrings = (value: unknown) => Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 
-function normalizeEvent(raw: any, index: number): IntelEvent {
+function normalizeEvent(raw: any, index: number): IntelEvent & Record<string, any> {
   return {
     id: String(raw?.id || `event-${index}`),
     title: String(raw?.title || 'Evento sin título'),
     description: String(raw?.description || ''),
     link: String(raw?.link || ''),
-    source: String(raw?.source || 'Fuente desconocida'),
+    source: String(raw?.source || raw?.feedId || 'Fuente desconocida'),
     publishedAt: String(raw?.publishedAt || new Date().toISOString()),
     image: typeof raw?.image === 'string' ? raw.image : undefined,
     lat: typeof raw?.lat === 'number' ? raw.lat : undefined,
@@ -21,15 +21,21 @@ function normalizeEvent(raw: any, index: number): IntelEvent {
     country: typeof raw?.country === 'string' ? raw.country : undefined,
     actors: safeStrings(raw?.actors),
     tags: safeStrings(raw?.tags),
-    severity: Number.isFinite(Number(raw?.severity)) ? Number(raw.severity) : 1
+    severity: Number.isFinite(Number(raw?.severity)) ? Number(raw.severity) : 1,
+    category: typeof raw?.category === 'string' ? raw.category : undefined,
+    interestScore: Number.isFinite(Number(raw?.interestScore)) ? Number(raw.interestScore) : undefined,
+    locationLabel: typeof raw?.locationLabel === 'string' ? raw.locationLabel : undefined,
+    geoConfidence: Number.isFinite(Number(raw?.geoConfidence)) ? Number(raw.geoConfidence) : undefined,
   };
 }
 
 export default function LiveIntelMap() {
-  const [events, setEvents] = useState<IntelEvent[]>([]);
-  const [selected, setSelected] = useState<IntelEvent | null>(null);
+  const [events, setEvents] = useState<(IntelEvent & Record<string, any>)[]>([]);
+  const [selected, setSelected] = useState<(IntelEvent & Record<string, any>) | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [windowPos, setWindowPos] = useState({ x: 36, y: 92 });
+  const dragRef = useRef<{ dx:number; dy:number } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -57,24 +63,58 @@ export default function LiveIntelMap() {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    const move = (ev: PointerEvent) => {
+      if (!dragRef.current) return;
+      const maxX = Math.max(8, window.innerWidth - Math.min(470, window.innerWidth - 24) - 8);
+      const maxY = Math.max(8, window.innerHeight - 120);
+      setWindowPos({
+        x: Math.max(8, Math.min(maxX, ev.clientX - dragRef.current.dx)),
+        y: Math.max(56, Math.min(maxY, ev.clientY - dragRef.current.dy)),
+      });
+    };
+    const up = () => { dragRef.current = null; };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+  }, []);
+
   const safeEvents = Array.isArray(events) ? events : [];
   const mapped = useMemo(() => safeEvents.filter(e => typeof e?.lat === 'number' && typeof e?.lng === 'number'), [safeEvents]);
   const selectedActors = safeStrings(selected?.actors);
 
   const inspector = selected && typeof document !== 'undefined' ? createPortal(
-    <div className="floating-intel-window" role="dialog" aria-modal="true">
-      <div className="floating-window-header">
-        <b>EVENT / {selected.source}</b>
-        <button onClick={()=>setSelected(null)} aria-label="Cerrar"><X size={15}/></button>
+    <div className="floating-intel-window" role="dialog" aria-modal="false" style={{ left: windowPos.x, top: windowPos.y }}>
+      <div
+        className="floating-window-header floating-window-drag-handle"
+        onPointerDown={(ev) => {
+          const rect = (ev.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+          dragRef.current = { dx: ev.clientX - rect.left, dy: ev.clientY - rect.top };
+          ev.currentTarget.setPointerCapture?.(ev.pointerId);
+        }}
+      >
+        <div className="floating-window-title"><GripHorizontal size={14}/><b>EVENT / {selected.source}</b></div>
+        <button onPointerDown={e=>e.stopPropagation()} onClick={()=>setSelected(null)} aria-label="Cerrar"><X size={15}/></button>
       </div>
       {selected.image && <img src={selected.image} className="floating-window-image" alt="" />}
       <div className="floating-window-body">
         <div className="event-meta-row">
-          {selected.country && <span><MapPin size={12}/>{selected.country}</span>}
+          {(selected.locationLabel || selected.country) && <span><MapPin size={12}/>{selected.locationLabel || selected.country}</span>}
           <span>Severidad {selected.severity}/10</span>
         </div>
         <h3>{selected.title}</h3>
         <p>{selected.description || 'Sin descripción disponible.'}</p>
+        <div className="intel-detail-grid">
+          <span><b>Fuente</b>{selected.source}</span>
+          <span><b>Categoría</b>{selected.category || 'open-source'}</span>
+          <span><b>Interés</b>{selected.interestScore ?? '—'}</span>
+          <span><b>Geo confianza</b>{selected.geoConfidence ? `${Math.round(selected.geoConfidence * 100)}%` : '—'}</span>
+          <span><b>Fecha</b>{new Date(selected.publishedAt).toLocaleString()}</span>
+          <span><b>TLP</b>TLP:CLEAR</span>
+        </div>
         {selectedActors.length > 0 && <div className="tag-row">{selectedActors.map(a=><span key={a}>{a}</span>)}</div>}
         {selected.link && <a href={selected.link} target="_blank" rel="noreferrer">Abrir fuente <ExternalLink size={13}/></a>}
       </div>
@@ -111,10 +151,10 @@ export default function LiveIntelMap() {
       </div>
 
       <aside className="live-feed-panel aegis-card">
-        <div className="live-feed-header"><Newspaper size={15}/><div><b>Eventos en vivo</b><span>{safeEvents.length} resultados</span></div></div>
+        <div className="live-feed-header"><Newspaper size={15}/><div><b>Eventos en vivo</b><span>{safeEvents.length} resultados · scroll para explorar</span></div></div>
         <div className="live-feed-list">
           {safeEvents.length === 0 && !loading && <div className="live-empty">No hay eventos disponibles.</div>}
-          {safeEvents.slice(0,60).map(e => {
+          {safeEvents.slice(0,120).map(e => {
             const eventActors = safeStrings(e?.actors);
             return <article
               key={e.id}
@@ -125,11 +165,16 @@ export default function LiveIntelMap() {
                 <small>{e.source} · {new Date(e.publishedAt).toLocaleString()}</small>
                 <h3>{e.title}</h3>
                 <p>{e.description || 'Sin descripción disponible.'}</p>
-                <div className="live-event-footer">
-                  {e.country && <span className="event-country"><MapPin size={10}/>{e.country}</span>}
-                  <span className="event-severity">S{e.severity}</span>
+                <div className="live-event-info-row">
+                  <span>{e.category || 'open-source'}</span>
+                  {typeof e.interestScore === 'number' && <span>INT {e.interestScore}</span>}
+                  <span>TLP:CLEAR</span>
                 </div>
-                {eventActors.length > 0 && <div className="tag-row">{eventActors.map(a=><span key={a}>{a}</span>)}</div>}
+                <div className="live-event-footer">
+                  {(e.locationLabel || e.country) && <span className="event-country"><MapPin size={10}/>{e.locationLabel || e.country}</span>}
+                  <span className="event-severity">S{e.severity}/10</span>
+                </div>
+                {eventActors.length > 0 && <div className="tag-row">{eventActors.slice(0,4).map(a=><span key={a}>{a}</span>)}</div>}
               </div>
             </article>;
           })}
