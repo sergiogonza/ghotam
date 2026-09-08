@@ -1,49 +1,26 @@
 import { useEvents } from '../hooks/useApi';
 import { useNavigate } from 'react-router-dom';
-import { useMemo, useState } from 'react';
-import { Activity, Filter, MapPin, ExternalLink } from 'lucide-react';
+import { useMemo,useState } from 'react';
+import { Activity,ExternalLink,Filter,MapPin } from 'lucide-react';
+import { analyzeAll } from '../live/analysisEngine';
 import Pagination from './Pagination';
 
-const severityClass = (s:number) => s >= 5 ? 'bg-red-600/30 text-red-300 border-red-500/40' : s >= 4 ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' : s >= 3 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : s >= 2 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-slate-500/20 text-slate-300 border-slate-500/30';
+const severityClass=(s:number)=>s>=5?'bg-red-600/30 text-red-300 border-red-500/40':s>=4?'bg-orange-500/20 text-orange-300 border-orange-500/30':s>=3?'bg-yellow-500/20 text-yellow-400 border-yellow-500/30':s>=2?'bg-blue-500/20 text-blue-400 border-blue-500/30':'bg-slate-500/20 text-slate-300 border-slate-500/30';
+const riskClass=(r:string)=>r==='CRITICAL'?'text-red-400':r==='HIGH'?'text-orange-400':r==='ELEVATED'?'text-yellow-400':r==='GUARDED'?'text-cyan-400':'text-slate-400';
 
-export default function EventsView() {
-  const { data: events = [], isLoading } = useEvents();
-  const navigate = useNavigate();
-  const [page,setPage] = useState(1);
-  const [typeFilter,setTypeFilter] = useState('All');
-  const [minSeverity,setMinSeverity] = useState(0);
-  const PAGE_SIZE=14;
-  const safeEvents = Array.isArray(events) ? events : [];
-
-  const types = useMemo(()=>['All',...Array.from(new Set(safeEvents.map(e=>e.eventType).filter(Boolean))).sort()], [safeEvents]);
-  const filtered = useMemo(()=>safeEvents.filter(e=>(typeFilter==='All'||e.eventType===typeFilter)&&Number(e.severity)>=minSeverity),[safeEvents,typeFilter,minSeverity]);
+export default function EventsView(){
+  const {data:events=[],isLoading}=useEvents();const navigate=useNavigate();const[page,setPage]=useState(1);const[typeFilter,setTypeFilter]=useState('All');const[minSeverity,setMinSeverity]=useState(0);const PAGE_SIZE=14;
+  const safeEvents=Array.isArray(events)?events:[];
+  const analyzed=useMemo(()=>{const raws=safeEvents.map(e=>(e.metadata as any)?.raw).filter(Boolean);return new Map(analyzeAll(raws).map(x=>[x.event.id,x]))},[safeEvents]);
+  const types=useMemo(()=>['All',...Array.from(new Set(safeEvents.map(e=>e.eventType).filter(Boolean))).sort()],[safeEvents]);
+  const filtered=useMemo(()=>safeEvents.filter(e=>(typeFilter==='All'||e.eventType===typeFilter)&&Number(e.severity)>=minSeverity),[safeEvents,typeFilter,minSeverity]);
   const visible=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
 
-  return <div className="space-y-5 animate-slide-in">
-    <div className="flex items-center justify-between gap-4 flex-wrap">
-      <div><h2 className="text-xl font-bold text-gray-100">Live Event Registry</h2><p className="text-xs text-gray-500 mt-1">Public-source RSS events normalized into GHOTAM ontology</p></div>
-      <div className="flex items-center gap-2 text-xs text-cyan-400"><Activity className="w-4 h-4"/>{filtered.length} / {safeEvents.length} events</div>
-    </div>
-
-    <div className="aegis-card p-3 flex items-center gap-4 flex-wrap">
-      <div className="flex items-center gap-2"><Filter size={14} className="text-gray-500"/><span className="text-xs text-gray-500">Type</span><select value={typeFilter} onChange={e=>{setTypeFilter(e.target.value);setPage(1)}} className="bg-[var(--aegis-surface-2)] border border-[var(--aegis-border)] rounded px-2 py-1.5 text-xs text-gray-300">{types.map(t=><option key={t}>{t}</option>)}</select></div>
-      <div className="flex items-center gap-2"><span className="text-xs text-gray-500">Min severity</span>{[0,1,2,3,4,5].map(s=><button key={s} onClick={()=>{setMinSeverity(s);setPage(1)}} className={`px-2 py-1 rounded border text-xs ${minSeverity===s?severityClass(s):'border-transparent bg-[var(--aegis-surface-2)] text-gray-500'}`}>{s}</button>)}</div>
-    </div>
-
-    {isLoading ? <div className="text-center py-10 text-cyan-400 animate-pulse">Loading live RSS registry...</div> : <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-      {visible.map(evt=>{
-        const m=(evt.metadata||{}) as any;
-        const actors=Array.isArray(m.actors)?m.actors:[];
-        return <article key={evt.eventId} className="aegis-card p-4 hover:border-cyan-500/30 transition-colors cursor-pointer" onClick={()=>navigate(`/graph/${evt.eventId}`)}>
-          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[9px] uppercase tracking-wider text-gray-600">{String(m.source||'RSS')} · {new Date(evt.timestamp).toLocaleString()}</div><h3 className="text-sm font-semibold text-gray-100 mt-1 leading-snug">{evt.description}</h3></div><span className={`flex-shrink-0 px-2 py-1 rounded border text-[10px] font-mono ${severityClass(Number(evt.severity)||0)}`}>SEV-{evt.severity}</span></div>
-          <div className="flex flex-wrap gap-2 mt-3 text-[10px] text-gray-400"><span className="px-2 py-1 rounded bg-slate-500/10 border border-slate-500/20">{evt.eventType}</span><span className="px-2 py-1 rounded bg-slate-500/10 border border-slate-500/20">TLP:CLEAR</span>{evt.facilityName&&<span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/20"><MapPin size={10}/>{evt.facilityName}</span>}{typeof m.interestScore==='number'&&<span className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20">INT {m.interestScore}</span>}</div>
-          {actors.length>0&&<div className="flex flex-wrap gap-1.5 mt-3">{actors.slice(0,6).map((a:string)=><span key={a} className="text-[9px] px-2 py-1 rounded-full border border-purple-500/20 bg-purple-500/10 text-purple-300">{a}</span>)}</div>}
-          {m.sourceUrl&&<a href={m.sourceUrl} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="inline-flex items-center gap-1 text-[10px] text-cyan-400 mt-3">Open source <ExternalLink size={10}/></a>}
-        </article>;
-      })}
-      {!visible.length&&<div className="aegis-card p-8 text-center text-sm text-gray-500 xl:col-span-2">No events match the current filters.</div>}
-    </div>}
-
-    <Pagination currentPage={page} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage}/>
-  </div>;
+  return <div className="space-y-5 animate-slide-in"><div className="flex items-center justify-between gap-4 flex-wrap"><div><h2 className="text-xl font-bold text-gray-100">Live Event Registry</h2><p className="text-xs text-gray-500 mt-1">TLP handling · unified risk · prospective signal classification · provenance</p></div><div className="flex items-center gap-2 text-xs text-cyan-400"><Activity className="w-4 h-4"/>{filtered.length} / {safeEvents.length} events</div></div>
+    <div className="aegis-card p-3 flex items-center gap-4 flex-wrap"><div className="flex items-center gap-2"><Filter size={14} className="text-gray-500"/><span className="text-xs text-gray-500">Type</span><select value={typeFilter} onChange={e=>{setTypeFilter(e.target.value);setPage(1)}} className="bg-[var(--aegis-surface-2)] border border-[var(--aegis-border)] rounded px-2 py-1.5 text-xs text-gray-300">{types.map(t=><option key={t}>{t}</option>)}</select></div><div className="flex items-center gap-2"><span className="text-xs text-gray-500">Min severity</span>{[0,1,2,3,4,5].map(s=><button key={s} onClick={()=>{setMinSeverity(s);setPage(1)}} className={`px-2 py-1 rounded border text-xs ${minSeverity===s?severityClass(s):'border-transparent bg-[var(--aegis-surface-2)] text-gray-500'}`}>{s}</button>)}</div></div>
+    {isLoading?<div className="text-center py-10 text-cyan-400 animate-pulse">Loading live RSS registry...</div>:<div className="grid grid-cols-1 xl:grid-cols-2 gap-3">{visible.map(evt=>{const m=(evt.metadata||{}) as any;const actors=Array.isArray(m.actors)?m.actors:[];const intel=analyzed.get(evt.eventId);return <article key={evt.eventId} className="aegis-card p-4 hover:border-cyan-500/30 transition-colors cursor-pointer" onClick={()=>navigate(`/graph/${encodeURIComponent(`LIVECASE:${evt.eventId}`)}`)}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[9px] uppercase tracking-wider text-gray-600">{String(m.source||'RSS')} · {new Date(evt.timestamp).toLocaleString()}</div><h3 className="text-sm font-semibold text-gray-100 mt-1 leading-snug">{evt.description}</h3></div><span className={`flex-shrink-0 px-2 py-1 rounded border text-[10px] font-mono ${severityClass(Number(evt.severity)||0)}`}>SEV-{evt.severity}</span></div>
+      <div className="flex flex-wrap gap-2 mt-3 text-[10px] text-gray-400"><span className="px-2 py-1 rounded bg-slate-500/10 border border-slate-500/20">{evt.eventType}</span><span className="px-2 py-1 rounded bg-slate-500/10 border border-slate-500/20">{String(m.tlp||'TLP:CLEAR')}</span>{evt.facilityName&&<span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/20"><MapPin size={10}/>{evt.facilityName}</span>}</div>
+      {intel&&<div className="grid grid-cols-6 gap-2 mt-3 rounded-lg bg-black/20 border border-white/5 p-2 text-[9px]"><span className={riskClass(intel.analysis.riskLevel)}>RISK {intel.analysis.riskScore.toFixed(1)}</span><span>PLS {Math.round(intel.analysis.plausibility*100)}</span><span>PRB {Math.round(intel.analysis.probability*100)}</span><span>NOV {Math.round(intel.analysis.novelty*100)}</span><span>MOM {Math.round(intel.analysis.momentum*100)}</span><span>IMP {Math.round(intel.analysis.impact*100)}</span><span className="col-span-6 text-cyan-500">{intel.analysis.signalClass}</span></div>}
+      {actors.length>0&&<div className="flex flex-wrap gap-1.5 mt-3">{actors.slice(0,6).map((a:string)=><span key={a} className="text-[9px] px-2 py-1 rounded-full border border-purple-500/20 bg-purple-500/10 text-purple-300">{a}</span>)}</div>}{m.sourceUrl&&<a href={m.sourceUrl} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="inline-flex items-center gap-1 text-[10px] text-cyan-400 mt-3">Open source <ExternalLink size={10}/></a>}</article>})}{!visible.length&&<div className="aegis-card p-8 text-center text-sm text-gray-500 xl:col-span-2">No events match the current filters.</div>}</div>}
+    <Pagination currentPage={page} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage}/></div>;
 }
