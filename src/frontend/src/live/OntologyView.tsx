@@ -8,8 +8,23 @@ const colors: Record<string,string> = { Event:'#f59e0b', Actor:'#06b6d4', Locati
 export default function OntologyView(){
   const ref = useRef<HTMLDivElement>(null);
   const [events,setEvents] = useState<IntelEvent[]>([]);
+  const [error,setError] = useState('');
 
-  useEffect(()=>{ fetch('/api/rss').then(r=>r.json()).then(d=>setEvents(d.events||[])); },[]);
+  useEffect(()=>{
+    fetch('/api/rss', { headers: { accept: 'application/json' } })
+      .then(async (r)=>{
+        const contentType = r.headers.get('content-type') || '';
+        if(!r.ok) throw new Error(`RSS API ${r.status}`);
+        if(!contentType.includes('application/json')) throw new Error('RSS API devolvió una respuesta no JSON');
+        return r.json();
+      })
+      .then(d=>setEvents(Array.isArray(d?.events) ? d.events : []))
+      .catch(err=>{
+        console.error('Ontology RSS error', err);
+        setEvents([]);
+        setError(err instanceof Error ? err.message : 'No se pudo cargar RSS');
+      });
+  },[]);
 
   useEffect(()=>{
     if(!ref.current) return;
@@ -30,5 +45,7 @@ export default function OntologyView(){
   },[events]);
 
   return <div className="h-full flex flex-col gap-3"><div><h2 className="text-xl font-bold text-gray-100">Ontology Live</h2>
-  <p className="text-xs text-gray-500">Event → Actor / Location / Source</p></div><div ref={ref} className="aegis-card flex-1 min-h-[650px]" /></div>;
+  <p className="text-xs text-gray-500">Event → Actor / Location / Source</p></div>
+  {error && <div className="aegis-card p-3 text-sm text-amber-300">{error}</div>}
+  <div ref={ref} className="aegis-card flex-1 min-h-[650px]" /></div>;
 }
