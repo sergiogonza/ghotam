@@ -20,7 +20,7 @@ export default function GraphExplorer(){
   const semanticResults=useMemo(()=>{
     const q=query.trim().toLowerCase(); if(!q)return[];
     const seed:IntelRecord={id:'q',title:q,description:q,source:'',link:'',publishedAt:new Date().toISOString(),actors:[],tags:[],category:'world',severity:1,geoConfidence:0,interestScore:0,tlp:'TLP:CLEAR'};
-    return analyzed.map(x=>({...x,score:semanticSimilarity(seed,x.event)+(((x.event.title+' '+x.event.description+' '+x.event.actors.join(' ')).toLowerCase().includes(q))?.35:0)})).filter(x=>x.score>.08).sort((a,b)=>b.score-a.score).slice(0,30);
+    return analyzed.map(x=>{const haystack=(x.event.title+' '+x.event.description+' '+x.event.actors.join(' ')).toLowerCase();return{...x,score:semanticSimilarity(seed,x.event)+Number(haystack.includes(q))*.35}}).filter(x=>x.score>.08).sort((a,b)=>b.score-a.score).slice(0,30);
   },[query,analyzed]);
   const related=useMemo(()=>selectedEvent?[...analyzed].filter(x=>x.event.id!==selectedEvent.event.id).map(x=>({...x,score:semanticSimilarity(selectedEvent.event,x.event)})).filter(x=>x.score>.12).sort((a,b)=>b.score-a.score).slice(0,15):[],[selectedEvent,analyzed]);
   const sources=useMemo(()=>{const m=new Map<string,{count:number;links:string[]}>();related.forEach(x=>{const s=m.get(x.event.source)||{count:0,links:[]};s.count++;if(x.event.link)s.links.push(x.event.link);m.set(x.event.source,s)});if(selectedEvent){const s=m.get(selectedEvent.event.source)||{count:0,links:[]};s.count++;if(selectedEvent.event.link)s.links.push(selectedEvent.event.link);m.set(selectedEvent.event.source,s)}return[...m.entries()].sort((a,b)=>b[1].count-a[1].count)},[related,selectedEvent]);
