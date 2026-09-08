@@ -1,233 +1,49 @@
 import { useEvents } from '../hooks/useApi';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useState } from 'react';
-import { Activity, Filter } from 'lucide-react';
-import EntityActionModal from './EntityActionModal';
+import { useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Activity, Filter, MapPin, ExternalLink } from 'lucide-react';
 import Pagination from './Pagination';
 
-const EVENT_TYPES = [
-  'All',
-  'SensorReading',
-  'Access',
-  'Maintenance',
-  'SystemStatus',
-  'QualityCheck',
-  'PhysicalAnomaly',
-  'UnauthorizedAccess',
-  'CyberAlert',
-  'CitizenReport',
-];
-
-const EVENT_TYPE_ICONS: Record<string, string> = {
-  SensorReading: '📡',
-  Access: '🎫',
-  Maintenance: '🔧',
-  SystemStatus: '💚',
-  QualityCheck: '🧪',
-  PhysicalAnomaly: '⚡',
-  UnauthorizedAccess: '🚪',
-  CyberAlert: '🔒',
-  CitizenReport: '📢',
-};
+const severityClass = (s:number) => s >= 5 ? 'bg-red-600/30 text-red-300 border-red-500/40' : s >= 4 ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' : s >= 3 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : s >= 2 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-slate-500/20 text-slate-300 border-slate-500/30';
 
 export default function EventsView() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [typeFilter, setTypeFilter] = useState<string>(
-    searchParams.get('eventType') ?? 'All'
-  );
-
-  // Support both legacy minSeverity (from dashboard critical alerts link) and exact severity
-  const initialSeverity = searchParams.has('minSeverity')
-    ? -Number(searchParams.get('minSeverity'))   // negative = "min" mode (from dashboard)
-    : searchParams.has('severity')
-    ? Number(searchParams.get('severity'))
-    : -1;  // -1 = "All"
-
-  const [severityFilter, setSeverityFilter] = useState<number>(initialSeverity);
-
-  // Build query params: negative = minSeverity, 0+ = exact severity, -1 = all
-  const queryParams = {
-    eventType: typeFilter === 'All' ? undefined : typeFilter,
-    minSeverity: severityFilter < -1 ? Math.abs(severityFilter) : undefined,
-    severity: severityFilter >= 0 ? severityFilter : undefined,
-  };
-
-  const { data: events, isLoading } = useEvents(queryParams);
+  const { data: events = [], isLoading } = useEvents();
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 10;
-  const [modalEntity, setModalEntity] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [page,setPage] = useState(1);
+  const [typeFilter,setTypeFilter] = useState('All');
+  const [minSeverity,setMinSeverity] = useState(0);
+  const PAGE_SIZE=14;
+  const safeEvents = Array.isArray(events) ? events : [];
 
-  const handleSeverityClick = (s: number) => {
-    // s: -1 = All, 0 = SEV-0, 1 = SEV-1, etc.
-    setSeverityFilter(s);
-    const p = new URLSearchParams(searchParams);
-    p.delete('minSeverity');
-    p.delete('severity');
-    if (s >= 0) p.set('severity', String(s));
-    setSearchParams(p, { replace: true });
-  };
+  const types = useMemo(()=>['All',...Array.from(new Set(safeEvents.map(e=>e.eventType).filter(Boolean))).sort()], [safeEvents]);
+  const filtered = useMemo(()=>safeEvents.filter(e=>(typeFilter==='All'||e.eventType===typeFilter)&&Number(e.severity)>=minSeverity),[safeEvents,typeFilter,minSeverity]);
+  const visible=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE);
 
-  return (
-    <div className="space-y-6 animate-slide-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-gray-100">Event Feed</h2>
-          <p className="text-xs text-gray-500 mt-1">
-            All detected events across monitored facilities
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <Activity className="w-4 h-4" />
-          {events?.length ?? 0} events
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-4 items-center">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-gray-500" />
-          <span className="text-xs text-gray-500">Type:</span>
-          <div className="flex gap-1">
-            {EVENT_TYPES.map((t) => (
-              <button
-                key={t}
-                onClick={() => {
-                  setTypeFilter(t);
-                  const p = new URLSearchParams(searchParams);
-                  if (t === 'All') p.delete('eventType'); else p.set('eventType', t);
-                  setSearchParams(p, { replace: true });
-                }}
-                className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
-                  typeFilter === t
-                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                    : 'bg-[var(--aegis-surface-2)] text-gray-500 border border-transparent hover:text-gray-300'
-                }`}
-              >
-                {t === 'All' ? 'All' : `${EVENT_TYPE_ICONS[t] || ''} ${t}`}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Severity:</span>
-          <div className="flex gap-1">
-            {([-1, 0, 1, 2, 3, 4, 5] as number[]).map((s) => {
-              const SEVERITY_COLORS: Record<number, string> = {
-                0: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-                1: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                2: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-                3: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-                4: 'bg-red-500/20 text-red-400 border-red-500/30',
-                5: 'bg-rose-600/30 text-rose-300 border-rose-500/40',
-              };
-              const active = severityFilter === s;
-              const colorClass = active && s >= 0 ? SEVERITY_COLORS[s] : '';
-              return (
-                <button
-                  key={s}
-                  onClick={() => handleSeverityClick(s)}
-                  className={`min-w-[1.75rem] h-7 px-1.5 rounded-lg text-xs transition-colors border ${
-                    active
-                      ? colorClass || 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                      : 'bg-[var(--aegis-surface-2)] text-gray-500 border-transparent hover:text-gray-300'
-                  }`}
-                >
-                  {s === -1 ? 'All' : s}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="text-center py-8 text-cyan-400 animate-pulse">
-          Loading events...
-        </div>
-      ) : (
-        <div className="aegis-card divide-y divide-[var(--aegis-border)]">
-          {events
-            ?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-            .map((evt) => (
-            <div
-              key={evt.eventId}
-              onClick={() =>
-                setModalEntity({ id: evt.eventId, name: evt.description.slice(0, 60) })
-              }
-              className="flex items-center gap-4 p-4 hover:bg-white/5 cursor-pointer transition-colors"
-            >
-              {/* Severity indicator */}
-              <div className="w-1 h-12 rounded-full" style={{
-                backgroundColor: evt.severity >= 5 ? '#ef4444' :
-                  evt.severity >= 4 ? '#f97316' :
-                  evt.severity >= 3 ? '#fbbf24' :
-                  evt.severity >= 2 ? '#60a5fa' :
-                  evt.severity >= 1 ? '#94a3b8' : '#34d399'
-              }} />
-
-              {/* Icon */}
-              <div className="text-xl flex-shrink-0 w-8 text-center">
-                {EVENT_TYPE_ICONS[evt.eventType] || '📋'}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1">
-                <p className="text-sm text-gray-200">{evt.description}</p>
-                <div className="flex items-center gap-4 mt-1">
-                  <span className="text-xs text-gray-500">{evt.eventId}</span>
-                  <span className="text-xs text-gray-600">
-                    {new Date(evt.timestamp).toLocaleString()}
-                  </span>
-                  {evt.facilityName && (
-                    <span className="text-xs text-blue-400">📍 {evt.facilityName}</span>
-                  )}
-                  {evt.personName && (
-                    <span className="text-xs text-purple-400">👤 {evt.personName}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Type badge */}
-              <span className="px-2 py-1 rounded text-[10px] bg-[var(--aegis-surface-2)] text-gray-400 border border-[var(--aegis-border)]">
-                {evt.eventType}
-              </span>
-
-              {/* Severity badge */}
-              <span className={`px-2 py-1 rounded text-xs font-mono font-bold border ${
-                evt.severity === 0 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                evt.severity === 1 ? 'bg-slate-500/20 text-slate-300 border-slate-500/30' :
-                evt.severity === 2 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                evt.severity === 3 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                evt.severity === 4 ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' :
-                'bg-red-600/30 text-red-300 border-red-500/40'
-              }`}>
-                {evt.severity === 0 ? '✅ OK' : `SEV-${evt.severity}`}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Pagination
-        currentPage={page}
-        totalItems={events?.length ?? 0}
-        pageSize={PAGE_SIZE}
-        onPageChange={setPage}
-      />
-
-      {modalEntity && (
-        <EntityActionModal
-          entityId={modalEntity.id}
-          entityType="event"
-          entityName={modalEntity.name}
-          onClose={() => setModalEntity(null)}
-        />
-      )}
+  return <div className="space-y-5 animate-slide-in">
+    <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div><h2 className="text-xl font-bold text-gray-100">Live Event Registry</h2><p className="text-xs text-gray-500 mt-1">Public-source RSS events normalized into GHOTAM ontology</p></div>
+      <div className="flex items-center gap-2 text-xs text-cyan-400"><Activity className="w-4 h-4"/>{filtered.length} / {safeEvents.length} events</div>
     </div>
-  );
+
+    <div className="aegis-card p-3 flex items-center gap-4 flex-wrap">
+      <div className="flex items-center gap-2"><Filter size={14} className="text-gray-500"/><span className="text-xs text-gray-500">Type</span><select value={typeFilter} onChange={e=>{setTypeFilter(e.target.value);setPage(1)}} className="bg-[var(--aegis-surface-2)] border border-[var(--aegis-border)] rounded px-2 py-1.5 text-xs text-gray-300">{types.map(t=><option key={t}>{t}</option>)}</select></div>
+      <div className="flex items-center gap-2"><span className="text-xs text-gray-500">Min severity</span>{[0,1,2,3,4,5].map(s=><button key={s} onClick={()=>{setMinSeverity(s);setPage(1)}} className={`px-2 py-1 rounded border text-xs ${minSeverity===s?severityClass(s):'border-transparent bg-[var(--aegis-surface-2)] text-gray-500'}`}>{s}</button>)}</div>
+    </div>
+
+    {isLoading ? <div className="text-center py-10 text-cyan-400 animate-pulse">Loading live RSS registry...</div> : <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+      {visible.map(evt=>{
+        const m=(evt.metadata||{}) as any;
+        const actors=Array.isArray(m.actors)?m.actors:[];
+        return <article key={evt.eventId} className="aegis-card p-4 hover:border-cyan-500/30 transition-colors cursor-pointer" onClick={()=>navigate(`/graph/${evt.eventId}`)}>
+          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="text-[9px] uppercase tracking-wider text-gray-600">{String(m.source||'RSS')} · {new Date(evt.timestamp).toLocaleString()}</div><h3 className="text-sm font-semibold text-gray-100 mt-1 leading-snug">{evt.description}</h3></div><span className={`flex-shrink-0 px-2 py-1 rounded border text-[10px] font-mono ${severityClass(Number(evt.severity)||0)}`}>SEV-{evt.severity}</span></div>
+          <div className="flex flex-wrap gap-2 mt-3 text-[10px] text-gray-400"><span className="px-2 py-1 rounded bg-slate-500/10 border border-slate-500/20">{evt.eventType}</span><span className="px-2 py-1 rounded bg-slate-500/10 border border-slate-500/20">TLP:CLEAR</span>{evt.facilityName&&<span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/20"><MapPin size={10}/>{evt.facilityName}</span>}{typeof m.interestScore==='number'&&<span className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20">INT {m.interestScore}</span>}</div>
+          {actors.length>0&&<div className="flex flex-wrap gap-1.5 mt-3">{actors.slice(0,6).map((a:string)=><span key={a} className="text-[9px] px-2 py-1 rounded-full border border-purple-500/20 bg-purple-500/10 text-purple-300">{a}</span>)}</div>}
+          {m.sourceUrl&&<a href={m.sourceUrl} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="inline-flex items-center gap-1 text-[10px] text-cyan-400 mt-3">Open source <ExternalLink size={10}/></a>}
+        </article>;
+      })}
+      {!visible.length&&<div className="aegis-card p-8 text-center text-sm text-gray-500 xl:col-span-2">No events match the current filters.</div>}
+    </div>}
+
+    <Pagination currentPage={page} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage}/>
+  </div>;
 }
