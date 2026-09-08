@@ -4,13 +4,14 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import './index.css';
+import './live/live.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 5_000, // 5s – allows SignalR to trigger faster refreshes
+      staleTime: 5_000,
     },
   },
 });
