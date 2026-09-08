@@ -13,6 +13,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/telegram"
+  to = "/.netlify/functions/telegram"
+  status = 200
+
+[[redirects]]
   from = "/api/lm"
   to = "/.netlify/functions/lm"
   status = 200
