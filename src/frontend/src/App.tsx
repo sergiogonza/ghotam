@@ -1,4 +1,5 @@
 import { Suspense, lazy } from 'react';
+import type { ReactNode } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import LiveIntelMap from './live/LiveIntelMap';
@@ -16,7 +17,7 @@ const EntityInvestigation = lazy(() => import('./components/EntityInvestigation'
 const CommandCenter = lazy(() => import('./components/CommandCenter'));
 const RiskPropagation = lazy(() => import('./components/RiskPropagation'));
 
-const legacy = (node: React.ReactNode) => (
+const legacy = (node: ReactNode) => (
   <Suspense fallback={<div className="aegis-card p-4 text-sm text-gray-400">Cargando módulo…</div>}>
     {node}
   </Suspense>
