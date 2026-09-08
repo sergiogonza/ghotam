@@ -78,10 +78,6 @@ export interface AgentStep {
 }
 
 export const aiApi = {
-  /**
-   * Stream an AI agent investigation of a risk case via SSE.
-   * The agent sends structured steps: thought, action, observation, answer.
-   */
   investigateStream: (
     caseId: string,
     onStep: (step: AgentStep) => void,
@@ -120,7 +116,6 @@ export const aiApi = {
               if (step.content?.startsWith('[ERROR]')) { onError(step.content); onDone(); return; }
               onStep(step);
             } catch {
-              // Legacy fallback: treat as answer text
               onStep({ type: 'answer', content: data.replace(/\\n/g, '\n') });
             }
           }
@@ -135,9 +130,6 @@ export const aiApi = {
     return abortController;
   },
 
-  /**
-   * Stream a follow-up chat message — also agent-powered.
-   */
   chatStream: (
     caseId: string,
     message: string,
@@ -193,9 +185,6 @@ export const aiApi = {
     return abortController;
   },
 
-  /**
-   * Stream an AI agent investigation of any entity (facility, person, event) via SSE.
-   */
   investigateEntityStream: (
     entityType: string,
     entityId: string,
@@ -249,9 +238,6 @@ export const aiApi = {
     return abortController;
   },
 
-  /**
-   * Stream agentic search – enriches Elasticsearch results with AI analysis.
-   */
   agenticSearchStream: (
     query: string,
     onStep: (step: AgentStep) => void,
@@ -302,9 +288,6 @@ export const aiApi = {
     return abortController;
   },
 
-  /**
-   * Stream a follow-up chat for entity investigations.
-   */
   chatEntityStream: (
     entityType: string,
     entityId: string,
@@ -363,7 +346,9 @@ export const aiApi = {
 
 export const commandCenterApi = {
   getAgents: () =>
-    api.get<AgentProfile[]>('/commandcenter/agents').then((r) => r.data),
+    api.get<AgentProfile[]>('/commandcenter/agents').then((r) =>
+      Array.isArray(r.data) ? r.data : []
+    ).catch(() => [] as AgentProfile[]),
 
   queryStream: (
     agentId: string,
@@ -381,8 +366,9 @@ export const commandCenterApi = {
       signal: abortController.signal,
     })
       .then(async (resp) => {
-        if (!resp.ok || !resp.body) {
-          onError(`HTTP ${resp.status}`);
+        const contentType = resp.headers.get('content-type') || '';
+        if (!resp.ok || !resp.body || contentType.includes('text/html')) {
+          onError('Command Center backend no disponible en este despliegue.');
           onDone();
           return;
         }
