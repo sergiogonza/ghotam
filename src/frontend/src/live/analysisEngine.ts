@@ -34,7 +34,7 @@ export function normalizeIntel(raw:any,index=0):IntelRecord{
     lat:Number.isFinite(Number(raw?.lat))?Number(raw.lat):(Number.isFinite(Number(primary?.lat))?Number(primary.lat):undefined),
     lng:Number.isFinite(Number(raw?.lng))?Number(raw.lng):(Number.isFinite(Number(primary?.lng))?Number(primary.lng):undefined),
     actors:arr(raw?.actors), tags:arr(raw?.tags), category:String(raw?.category||'world'), severity:num(raw?.severity,1),
-    geoConfidence:clamp(num(raw?.geoConfidence, raw?.country?.8:0)), interestScore:Math.max(0,Math.min(100,num(raw?.interestScore,num(raw?.severity,1)*10))), tlp,
+    geoConfidence:clamp(num(raw?.geoConfidence, raw?.country ? .8 : 0)), interestScore:Math.max(0,Math.min(100,num(raw?.interestScore,num(raw?.severity,1)*10))), tlp,
   };
 }
 
@@ -56,7 +56,7 @@ export function analyzeIntel(e:IntelRecord,stats:Map<string,PatternStat>):Analys
   const plausibility=clamp(.08+recurrence*.34+sourceDiversity*.26+e.geoConfidence*.14+actorSupport*.12+evidenceCompleteness*.06);
   const probability=clamp(.06+recency*.16+momentum*.28+sourceDiversity*.22+severity*.14+interest*.14);
   const novelty=clamp(1-(recurrence*.50+sourceDiversity*.28+actorSupport*.22));
-  const impact=clamp(severity*.58+interest*.32+(e.actors.length>=2?.10:0));
+  const impact=clamp(severity*.58+interest*.32+(e.actors.length>=2 ? .10 : 0));
   const confidence=clamp(evidenceCompleteness*.45+sourceDiversity*.35+e.geoConfidence*.20);
   const risk=clamp(impact*.35+probability*.25+confidence*.15+momentum*.15+severity*.10);
   const riskScore=risk*10;
@@ -78,7 +78,7 @@ export function semanticSimilarity(a:IntelRecord,b:IntelRecord){
   const sa=new Set([...tokens(a.title),...a.actors.map(x=>x.toLowerCase()),String(a.country||'').toLowerCase(),a.category.toLowerCase()].filter(Boolean));
   const sb=new Set([...tokens(b.title),...b.actors.map(x=>x.toLowerCase()),String(b.country||'').toLowerCase(),b.category.toLowerCase()].filter(Boolean));
   const inter=[...sa].filter(x=>sb.has(x)).length; const union=new Set([...sa,...sb]).size;
-  const lexical=union?inter/union:0; const actor=a.actors.some(x=>b.actors.includes(x))?.22:0; const location=(a.country&&a.country===b.country)?.18:0;
+  const lexical=union?inter/union:0; const actor=a.actors.some(x=>b.actors.includes(x)) ? .22 : 0; const location=(a.country&&a.country===b.country) ? .18 : 0;
   return clamp(lexical*.6+actor+location);
 }
 
