@@ -11,12 +11,17 @@ import PersonsView from './components/PersonsView';
 import EntityInvestigation from './components/EntityInvestigation';
 import CommandCenter from './components/CommandCenter';
 import RiskPropagation from './components/RiskPropagation';
+import LiveIntelMap from './live/LiveIntelMap';
+import OntologyView from './live/OntologyView';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
-        <Route index element={<Dashboard />} />
+        <Route index element={<LiveIntelMap />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="live" element={<LiveIntelMap />} />
+        <Route path="ontology" element={<OntologyView />} />
         <Route path="graph" element={<GraphExplorer />} />
         <Route path="graph/:nodeId" element={<GraphExplorer />} />
         <Route path="map" element={<MapView />} />
