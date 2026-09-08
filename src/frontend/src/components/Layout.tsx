@@ -2,12 +2,10 @@ import { Outlet, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Network, Map, ShieldAlert, Activity, Clock, Search,
   Building2, Users, Terminal, Waves, ExternalLink, X, GraduationCap,
-  Code2, Radio, Share2
+  Radio, Share2
 } from 'lucide-react';
 import { useState } from 'react';
 import SearchBar from './SearchBar';
-import { useSignalR } from '../hooks/useSignalR';
-import { useRiskCases } from '../hooks/useApi';
 
 const navItems = [
   { to: '/', icon: Radio, label: 'Live Intelligence' },
@@ -27,9 +25,6 @@ const navItems = [
 export default function Layout() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-  useSignalR();
-  const { data: cases } = useRiskCases();
-  const activeCases = cases?.filter((c) => c.status === 'Open' || c.status === 'Investigating') ?? [];
 
   return (
     <div className="flex h-screen bg-[var(--aegis-bg)]">
@@ -55,7 +50,7 @@ export default function Layout() {
           <div><h1 className="text-xs font-semibold text-gray-300 uppercase tracking-[.16em]">Ontology-driven public source intelligence</h1><p className="text-[9px] text-gray-600">RSS · GEO · EVENTS · ACTORS · SOURCES</p></div>
           <div className="flex items-center gap-2">
             <button onClick={()=>setSearchOpen(!searchOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--aegis-surface-2)] border border-[var(--aegis-border)] text-gray-400 text-xs"><Search className="w-3.5 h-3.5"/>Search</button>
-            <div className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-[10px] text-red-400">{activeCases.length} cases</div>
+            <div className="px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-[10px] text-cyan-400">LIVE</div>
           </div>
         </header>
         {searchOpen && <SearchBar onClose={()=>setSearchOpen(false)}/>}
