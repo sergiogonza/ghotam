@@ -1,16 +1,16 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard,Network,Map,ShieldAlert,Activity,Clock,Search,Building2,Users,Terminal,Waves,ExternalLink,X,GraduationCap,Radio,Share2,Database,BookOpen,Bell,Bookmark } from 'lucide-react';
+import { LayoutDashboard,Network,Map,ShieldAlert,Activity,Clock,Search,Building2,Users,Terminal,Waves,ExternalLink,X,GraduationCap,Radio,Share2,Database,BookOpen,Bell,Bookmark,Crosshair } from 'lucide-react';
 import { useEffect,useState } from 'react';
 import SearchBar from './SearchBar';
 import { getSourceMode,setSourceMode,type SourceMode } from '../live/sourceMode';
 import { checkForNewEvents,primeEventIndex,type NewEventSummary } from '../live/eventAlerts';
 
 const navItems=[
- {to:'/',icon:Radio,label:'Live Intelligence',code:'01'},{to:'/ontology',icon:Share2,label:'Ontology Live',code:'02'},{to:'/dashboard',icon:LayoutDashboard,label:'Dashboard',code:'03'},
- {to:'/admin',icon:Database,label:'Admin / CRUD',code:'04'},{to:'/corpus',icon:BookOpen,label:'Corpus / AI',code:'05'},{to:'/watchlists',icon:Bookmark,label:'Watchlists',code:'06'},
- {to:'/command-center',icon:Terminal,label:'Command Center',code:'07'},{to:'/risk-propagation',icon:Waves,label:'Risk Propagation',code:'08'},{to:'/map',icon:Map,label:'Facilities Map',code:'09'},
- {to:'/graph',icon:Network,label:'Graph Explorer',code:'10'},{to:'/cases',icon:ShieldAlert,label:'Risk Cases',code:'11'},{to:'/events',icon:Activity,label:'Events',code:'12'},
- {to:'/facilities',icon:Building2,label:'Facilities',code:'13'},{to:'/persons',icon:Users,label:'Persons',code:'14'},{to:'/timeline',icon:Clock,label:'Timeline',code:'15'},
+ {to:'/',icon:Crosshair,label:'Intelligence Workbench',code:'01'},{to:'/live',icon:Radio,label:'Live Intelligence',code:'02'},{to:'/ontology',icon:Share2,label:'Ontology Live',code:'03'},{to:'/dashboard',icon:LayoutDashboard,label:'Dashboard',code:'04'},
+ {to:'/admin',icon:Database,label:'Admin / CRUD',code:'05'},{to:'/corpus',icon:BookOpen,label:'Corpus / AI',code:'06'},{to:'/watchlists',icon:Bookmark,label:'Watchlists',code:'07'},
+ {to:'/command-center',icon:Terminal,label:'Command Center',code:'08'},{to:'/risk-propagation',icon:Waves,label:'Risk Propagation',code:'09'},{to:'/map',icon:Map,label:'Facilities Map',code:'10'},
+ {to:'/graph',icon:Network,label:'Graph Explorer',code:'11'},{to:'/cases',icon:ShieldAlert,label:'Risk Cases',code:'12'},{to:'/events',icon:Activity,label:'Events',code:'13'},
+ {to:'/facilities',icon:Building2,label:'Facilities',code:'14'},{to:'/persons',icon:Users,label:'Persons',code:'15'},{to:'/timeline',icon:Clock,label:'Timeline',code:'16'},
 ];
 export default function Layout(){
  const[searchOpen,setSearchOpen]=useState(false),[aboutOpen,setAboutOpen]=useState(false),[alertsOpen,setAlertsOpen]=useState(false);const[mode,setMode]=useState<SourceMode>(getSourceMode());const[alerts,setAlerts]=useState<NewEventSummary>({newEvents:[],minute:0,hour:0,day:0,lastCheckedAt:''});
