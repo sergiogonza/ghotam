@@ -18,6 +18,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/bluesky"
+  to = "/.netlify/functions/bluesky"
+  status = 200
+
+[[redirects]]
   from = "/api/lm"
   to = "/.netlify/functions/lm"
   status = 200
