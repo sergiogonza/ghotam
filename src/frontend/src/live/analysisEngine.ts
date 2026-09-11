@@ -27,8 +27,15 @@ const num = (v:unknown, fallback=0) => Number.isFinite(Number(v)) ? Number(v) : 
 const stop = new Set(['the','and','for','with','from','that','this','into','after','over','under','amid','about','says','said','say','new','latest','why','what','how']);
 
 const FAMILY_RULES:[string,string[]][] = [
+  ['threat-warning',['threat','threatened','security alert','warning of attack']],
+  ['armed-violence',['shooting','gunfire','shots fired','shooter','armed attack']],
+  ['crime-robbery',['robbery','armed robbery','theft','looting','raid']],
+  ['kidnapping-hostage',['kidnapping','kidnapped','abducted','hostage','hijacking']],
+  ['terror-security',['terror attack','terrorism','extremist','insurgent','militant']],
+  ['explosion-bombing',['explosion','blast','bombing','bomb exploded']],
+  ['clash-violence',['clash','clashes','fighting','firefight','violence']],
   ['nuclear',['nuclear','iaea','uranium','atomic']],
-  ['conflict-escalation',['attack','strike','war','offensive','missile','drone','troops','military','shelling','invasion']],
+  ['conflict-escalation',['attack','strike','war','offensive','missile','drone','troops','military','shelling','invasion','ambush','airstrike','artillery','mortar','rocket']],
   ['diplomacy',['diplomacy','talks','negotiation','summit','ceasefire','peace deal','treaty','recognition']],
   ['elections',['election','vote','poll','campaign','ballot']],
   ['political-reform',['reform','constitution','parliament','bill','legislation','referendum','coalition','cabinet']],
@@ -141,7 +148,8 @@ export function analyzeIntel(e:IntelRecord,stats:Map<string,PatternStat>):Analys
   const plausibility = clamp(.12 + recurrence*.30 + sourceDiversity*.24 + corroboration*.13 + e.geoConfidence*.08 + actorSupport*.08 + evidenceCompleteness*.05);
   const probability = clamp(.08 + recency*.18 + momentum*.24 + corroboration*.20 + severity*.12 + interest*.12 + geographicSpread*.06);
   const novelty = clamp(1 - (recurrence*.42 + sourceDiversity*.28 + corroboration*.16 + actorSupport*.09 + geographicSpread*.05));
-  const strategicFamilyBoost = (e.patternFamily === 'nuclear' || e.patternFamily === 'conflict-escalation') ? .10 : 0;
+  const strategicFamilies = new Set(['nuclear','conflict-escalation','terror-security','explosion-bombing','armed-violence','kidnapping-hostage']);
+  const strategicFamilyBoost = strategicFamilies.has(e.patternFamily) ? .10 : 0;
   const impact = clamp(severity*.48 + interest*.32 + (e.actors.length >= 2 ? .10 : 0) + strategicFamilyBoost);
   const confidence = clamp(evidenceCompleteness*.35 + sourceDiversity*.30 + corroboration*.20 + e.geoConfidence*.15);
   const risk = clamp(impact*.35 + probability*.25 + confidence*.15 + momentum*.15 + severity*.10);
