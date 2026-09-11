@@ -16,10 +16,10 @@ function dedupeSort(groups:any[][]){const byId=new Map<string,any>();groups.flat
 async function loadRemote(path:string,cacheKey:string,force=false){const r=await nativeFetch(path,{headers:{accept:'application/json'},cache:force?'no-store':'default'});const ct=r.headers.get('content-type')||'';if(!r.ok||!ct.includes('application/json'))throw new Error(`${path} ${r.status}`);const d=await r.json();const remote=Array.isArray(d?.events)?d.events:[];await setMemoryValue(cacheKey,remote).catch(()=>{});return remote}
 async function loadCached(key:string){const v=await getMemoryValue<any[]>(key).catch(()=>undefined);return Array.isArray(v)?v:[]}
 export async function loadAllIntel(force=false):Promise<any[]>{
- const manual=manualAsIntel(await listManualEvents().catch(()=>[]));let direct:any[]=[],alternative:any[]=[];
- if(force||navigator.onLine){const [d,a]=await Promise.allSettled([loadRemote('/api/rss','rss-cache',force),loadRemote('/api/telegram','telegram-cache',force)]);direct=d.status==='fulfilled'?d.value:await loadCached('rss-cache');alternative=a.status==='fulfilled'?a.value:await loadCached('telegram-cache');}
- else{direct=await loadCached('rss-cache');alternative=await loadCached('telegram-cache');}
- return dedupeSort([direct,manual,alternative]);
+ const manual=manualAsIntel(await listManualEvents().catch(()=>[]));let direct:any[]=[],alternative:any[]=[],social:any[]=[];
+ if(force||navigator.onLine){const [d,a,s]=await Promise.allSettled([loadRemote('/api/rss','rss-cache',force),loadRemote('/api/telegram','telegram-cache',force),loadRemote('/api/bluesky','bluesky-cache',force)]);direct=d.status==='fulfilled'?d.value:await loadCached('rss-cache');alternative=a.status==='fulfilled'?a.value:await loadCached('telegram-cache');social=s.status==='fulfilled'?s.value:await loadCached('bluesky-cache');}
+ else{direct=await loadCached('rss-cache');alternative=await loadCached('telegram-cache');social=await loadCached('bluesky-cache');}
+ return dedupeSort([direct,manual,alternative,social]);
 }
 export async function loadCombinedIntel(force=false):Promise<any[]>{return filterBySourceMode(await loadAllIntel(force),getSourceMode())}
 let interceptorInstalled=false;
