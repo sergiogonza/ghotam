@@ -9,6 +9,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/api/bluesky/live': { target: 'http://127.0.0.1:8790', changeOrigin: true },
+      '/api/bluesky': { target: 'http://127.0.0.1:8790', changeOrigin: true },
       '/api/rss': { target: 'http://localhost:8788', changeOrigin: true },
       '/api/lm': { target: 'http://localhost:8789', changeOrigin: true },
       '/api': { target: 'http://localhost:5000', changeOrigin: true },
